@@ -1,0 +1,4 @@
+*.o
+suggestomatic
+results.log
+.*.sw*
