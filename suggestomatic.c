@@ -36,14 +36,14 @@ set_b, unsigned int set_b_size) {
   while (set_a < set_a_stop && set_b < set_b_stop) {
     a = *set_a;
     b = *set_b;
-    if (a == b) {
+    if (a > b) {
+      ++set_b;
+    } else if (a == b) {
       intersections++;
-      set_a++;
-      set_b++;
-    } else if (a < b) {
-      set_a++;
+      ++set_a;
+      ++set_b;
     } else {
-      set_b++;
+      ++set_a;
     }
   }
   return intersections;
