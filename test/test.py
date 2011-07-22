@@ -47,7 +47,7 @@ def check_file_validity(file_location):
     os.unlink(file_location)
 
 # Find the top NUM_RECOMMENDATIONS recommendations for each group.
-def dump_output(user_likes_group, output_file_location):
+def dump_recommendations(user_likes_group, recommendations_file_location):
   # a_user_likes_both[a][b] is True iff a user likes both group a and group b.
   a_user_likes_both = [[0] * NUM_GROUPS for x in range(NUM_GROUPS)]
 
@@ -70,41 +70,62 @@ def dump_output(user_likes_group, output_file_location):
         for x in recommendations[group_id][:NUM_RECOMMENDATIONS]])
     output += "\n"
 
-  with open(output_file_location, 'w') as output_file:
-    output_file.write(output)
+  with open(recommendations_file_location, 'w') as recommendations_file:
+    recommendations_file.write(output)
 
 def main():
+  global NUM_USERS
+  global NUM_GROUPS
+  global NUM_RECOMMENDATIONS
+
+  only_csv = False
   data_file_name = "test_data"
-  output_file_name = "output"
+  recommendations_file_name = "output"
 
   if len(sys.argv) > 1:
     if sys.argv[1] == "--help":
-      print "%s : ./test.py [CSV_FILE [OUTPUT_FILE]]" % (bold_text("Usage"))
+      print "%s : ./test.py [--only-csv] [--num-groups=NUM] [--csv-file=CSV_FILE] [--output-file=OUTPUT_FILE]" % (bold_text("Usage"))
       print ""
       print "Will writes a CSV of user_id, group_id pairs to CSV_FILE. Then, " 
       print "writes the top %d recommendations to OUTPUT_FILE." % (NUM_RECOMMENDATIONS)
       print ""
       print bold_text("Command line options:")
       print ""
-      print "\t%s" % bold_text("CSV_FILE")
+      print "\t%s" % bold_text("--csv-file")
       print "\t\tOutput file for CSV data. Defaults to %s if not provided." % data_file_name
-      print "\t\tWill remove an old csv file if it exists." % data_file_name
-      print "\t%s" % bold_text("OUTPUT_FILE")
-      print "\t\tOutput file for correct suggestions. Defaults to %s if not provided." % output_file_name
-      print "\t\tWill remove an old output file if it exists." % data_file_name
+      print "\t\tWill remove an old csv file if it exists."
+      print "\t%s" % bold_text("--recommendation-file")
+      print "\t\tOutput file for correct suggestions. Defaults to %s if not provided." % recommendations_file_name
+      print "\t\tWill remove an old output file if it exists."
+      print "\t%s" % bold_text("--only-csv")
+      print "\t\tDon't generate an answer; only generate the CSV data."
+      print "\t%s" % bold_text("--num-groups=NUM")
+      print "\t\tOverride the default number of groups and users (%d); use NUM instead for both." % NUM_USERS
 
       exit(0)
     else:
-      data_file_name = sys.argv[1]
+      for arg in sys.argv[1:]:
+        if arg.startswith("--only-csv"):
+          only_csv = True
+        elif arg.startswith("--csv-file="):
+          data_file_name = arg[len("--csv-file="):]
+        elif arg.startswith("--recommendations-file="):
+          recommendations_file_name = arg[len("--recommendations-file="):]
+        elif arg.startswith("--num-groups="):
+          num = int(arg[len("--num-groups="):])
+          NUM_USERS = num
+          NUM_GROUPS = num
+        else:
+          print "Invalid option %s. Try ./test --help for help." % arg
 
   data_file_location = os.path.join(os.getcwd(), data_file_name)
-  output_file_location = os.path.join(os.getcwd(), output_file_name)
+  if not only_csv: recommendations_file_location = os.path.join(os.getcwd(), recommendations_file_name)
 
   check_file_validity(data_file_location)
-  check_file_validity(output_file_location)
+  if not only_csv: check_file_validity(recommendations_file_location)
   data = generate_testing_data()
   dump_data(data, data_file_location)
-  dump_output(data, output_file_location)
+  if not only_csv: dump_recommendations(data, recommendations_file_location)
 
 main()
 
