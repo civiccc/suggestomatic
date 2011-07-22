@@ -116,32 +116,34 @@ def load_or_enumerate_set_ids():
 set_ids = load_or_enumerate_set_ids()
 set_array_offsets = dict()
 
-SEGSIZE = 10000
-for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
-  log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
 
-  # reset data structures
+def extract_membership(set_id_segment, membership_fh):
   set_membership = dict((set_id, []) for set_id in set_id_segment)
   set_id_segment_set = set(set_id_segment)
   membership_fh.seek(0) # reset file
 
-  # read entire data file until we're out
+  # read entire data file until we've hit EOF
   try:
     for readbytes in itertools.count(0, BUFFERSIZE):
       pairs = in_pairs(fill_buffer(membership_fh, BUFFERSIZE))
-      for user_id, set_id in pairs:
+      for member_id, set_id in pairs:
         if set_id in set_id_segment_set:
-          set_membership[set_id].append(user_id)
+          set_membership[set_id].append(member_id)
       progress_func(readbytes, mb=100)
       if len(pairs) != (BUFFERSIZE / SIZEOFINT / 2):
         raise EOFError
-  except EOFError: pass
+  except EOFError:
+    pass
+  return set_membership
+
+SEGSIZE = 10000
+for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
+  log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
+  set_membership = extract_membership(set_id_segment, membership_fh)
 
   lens = map(len, set_membership.values())
-  log.info('Processed `%d` total set_ids and the biggest has `%d` members' % (
-      sum(lens), max(lens)
-  ))
-
+  log.info('Processed `%d` total set_ids' % sum(lens))
+  log.info('The biggest set has `%d` members' % max(lens))
 
   small_sets = 0
   with open(options.set_membership_arrays_filename, 'ab+') as fout:
@@ -189,11 +191,11 @@ print "max set_id: %d" % max_set_id
 
 with open(options.member_index_filename, 'wb') as indexfile:
   log.info('Generating index file `%s`.' % options.member_index_filename)
-  index_list = (
+  index_list = [
     set_array_offsets.get(set_id, 0)
     for set_id
     in xrange(max(set_array_offsets.keys()))
-  )
+  ]
   index_array = array.array('I')
   index_array.fromlist(index_list)
   index_array.tofile(indexfile)
