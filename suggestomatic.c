@@ -30,8 +30,8 @@ set_intersection(unsigned int* set_a, unsigned int set_a_size, unsigned int*
 set_b, unsigned int set_b_size) {
   unsigned int a, b;
   unsigned int step = get_step(set_a_size);
-  unsigned int* set_a_stop = set_a + set_a_size,
-              * set_b_stop = set_b + set_b_size;
+  unsigned int *set_a_stop = set_a + set_a_size,
+               *set_b_stop = set_b + set_b_size;
   unsigned int intersections = 0;
   while (set_a < set_a_stop && set_b < set_b_stop) {
     a = *set_a;
@@ -52,7 +52,7 @@ set_b, unsigned int set_b_size) {
 int
 test_set_intersection() {
   unsigned int set_a[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0};
-  unsigned int set_a_size = 11;
+  unsigned int set_a_size = sizeof(set_a) / sizeof(set_a[0]);
   unsigned int set_b[] = {5, 6, 7, 8, 9, 10, 11, 12, 0};
   unsigned int set_b_size = sizeof(set_b) / sizeof(set_b[0]);
   unsigned int members_in_common = set_intersection(set_a, set_a_size, set_b, set_b_size);
@@ -66,11 +66,11 @@ test_set_intersection() {
 struct fileinfo {
   int fh;
   size_t filesize;
-  void* head;
+  void *head;
 };
 
 struct fileinfo
-load_binary_file(char* filename) {
+load_binary_file(char *filename) {
   struct fileinfo fi;
 
   if ((fi.fh = open(filename, O_RDONLY)) == -1) {
@@ -87,7 +87,7 @@ load_binary_file(char* filename) {
 }
 
 void write_result(
-    FILE* fout,
+    FILE *fout,
     unsigned int set_id_a,
     unsigned int set_id_b,
     unsigned int intersection) {
@@ -123,9 +123,9 @@ print_progress(
 }
 
 void
-first_10_elements(unsigned int* head, char* filename) {
+first_10_elements(unsigned int *head, char *filename) {
   printf("Printing first 10 elements of %s\n", filename);
-  unsigned int* limit = head + 10;
+  unsigned int *limit = head + 10;
   for (; head < limit; head++) {
     printf("0x%zx: %u\n", head, *head);
   }
@@ -142,7 +142,7 @@ main(int argc, char *argv[]) {
        *suggestions_filename = argv[4];
 
   struct fileinfo set_ids_file = load_binary_file(set_ids_filename);
-  unsigned int* set_ids = (unsigned int*)(set_ids_file.head);
+  unsigned int *set_ids = (unsigned int*)(set_ids_file.head);
   unsigned int set_id_count = set_ids_file.filesize / sizeof(unsigned int);
   printf("Loaded %d sets\n", set_id_count);
 
@@ -153,19 +153,19 @@ main(int argc, char *argv[]) {
   //  acts as a set_id -> memory offset lookup table
   //  eg, indexarray[set_id] == arrays + offset_of_set_id_in_image
   struct fileinfo indexarray = load_binary_file(set_index_filename);
-  const unsigned int* indexptr = (unsigned int*) indexarray.head;
+  const unsigned int *indexptr = (unsigned int*) indexarray.head;
 
   // visual inspection sanity check
   first_10_elements((unsigned int*)indexarray.head, set_index_filename);
   
   // set_members_filename : binary image of set id membership arrays
   struct fileinfo arrays = load_binary_file(set_members_filename);
-  const unsigned int* arraysptr = (unsigned int*) arrays.head;
+  const unsigned int *arraysptr = (unsigned int*) arrays.head;
 
   // visual inspection sanity check
   first_10_elements((unsigned int*)arrays.head, set_members_filename);
 
-  const FILE* fout = fopen(suggestions_filename, "a+");
+  const FILE *fout = fopen(suggestions_filename, "a+");
   unsigned long counter = 0, intersection_count;
   int started_at = (int)time(NULL);
   unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
