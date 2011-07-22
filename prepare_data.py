@@ -23,13 +23,13 @@ def parseargs():
   parser = argparse.ArgumentParser(
     description="Prepare Suggestomatic data files from set membership CSV dump")
   parser.add_argument('--membership-filename', type=str,
-    help='set membership CSV filename')
+    help='(input) set membership binary image filename')
   parser.add_argument('--set-membership-arrays-filename', type=str,
-    help='Filename for array of user_id arrays')
+    help='(output) Filename for array of user_id arrays')
   parser.add_argument('--member-index-filename', type=str,
-    help='Filename for index array into members_array')
+    help='(output) Filename for index array into members_array')
   parser.add_argument('--set-id-filename', type=str,
-    help='Filename for array of set_ids (optional)')
+    help='(output / input) Filename for array of set_ids')
 
   options = parser.parse_args()
   if not options.set_membership_arrays_filename:
@@ -134,6 +134,19 @@ def verify_results(arrays_filename, set_array_offsets):
       zero_array.fromfile(set_array_bin, 1)
       assert zero_array[0] == 0
 
+def generate_index(index_filename, set_array_offsets):
+  with open(index_filename, 'wb') as fh:
+    log.info('Generating index file `%s`.' % index_filename)
+    index_list = [
+      set_array_offsets.get(set_id, 0)
+      for set_id
+      in xrange(max(set_array_offsets.keys()))
+    ]
+    index_array = array.array('I')
+    index_array.fromlist(index_list)
+    index_array.tofile(fh)
+    log.info('Finished generating index file.')
+
 BUFFERSIZE = 1024 * 64
 SIZEOFINT = 4
 INTCOUNT = BUFFERSIZE / SIZEOFINT
@@ -158,13 +171,11 @@ if __name__ == '__main__':
     small_sets = 0
     with open(options.set_membership_arrays_filename, 'ab+') as fout:
       for set_id, user_ids in set_membership.iteritems():
-        # drop one member sets
-        if len(user_ids) <= 1:
+        if len(user_ids) <= 1: # drop one member sets
           small_sets += 1
           continue
   
-        # add stop integer
-        user_ids += [0]
+        user_ids += [0] # add stop integer
   
         set_array_offsets[set_id] = file_offset = fout.tell()
         log.debug("Offset %d, set_id %s, about to write %d bytes" % (
@@ -180,21 +191,8 @@ if __name__ == '__main__':
         (fout.tell(), options.set_membership_arrays_filename)
       )
     log.info("Skipped %d sets with 1 member" % small_sets)
+
   verify_results(options.set_membership_arrays_filename, set_array_offsets)
+  generate_index(options.member_index_filename, set_array_offsets)
 
-max_set_id = max(map(int, set_array_offsets.keys()))
-print "max set_id: %d" % max_set_id
-
-
-with open(options.member_index_filename, 'wb') as indexfile:
-  log.info('Generating index file `%s`.' % options.member_index_filename)
-  index_list = [
-    set_array_offsets.get(set_id, 0)
-    for set_id
-    in xrange(max(set_array_offsets.keys()))
-  ]
-  index_array = array.array('I')
-  index_array.fromlist(index_list)
-  index_array.tofile(indexfile)
-  log.info('Finished generating index file.')
 
