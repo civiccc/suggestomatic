@@ -19,20 +19,25 @@ def log_and_exit(msg, error_code=(-1)):
   log.error(msg)
   sys.exit(error_code)
 
-# infile, outfile, offset, set_id_filename (.txt)
-parser = argparse.ArgumentParser(
-  description="Prepare Suggestomatic data files from set membership CSV dump")
-parser.add_argument('--membership-filename', type=str,
-  help='set membership CSV filename')
-parser.add_argument('--set-membership-arrays-filename', type=str,
-  help='Filename for array of user_id arrays')
-parser.add_argument('--member-index-filename', type=str,
-  help='Filename for index array into members_array')
-parser.add_argument('--set-id-filename', type=str,
-  help='Filename for array of set_ids (optional)')
+def parseargs():
+  parser = argparse.ArgumentParser(
+    description="Prepare Suggestomatic data files from set membership CSV dump")
+  parser.add_argument('--membership-filename', type=str,
+    help='set membership CSV filename')
+  parser.add_argument('--set-membership-arrays-filename', type=str,
+    help='Filename for array of user_id arrays')
+  parser.add_argument('--member-index-filename', type=str,
+    help='Filename for index array into members_array')
+  parser.add_argument('--set-id-filename', type=str,
+    help='Filename for array of set_ids (optional)')
 
-options = parser.parse_args()
-log.debug(options)
+  options = parser.parse_args()
+  if not options.set_membership_arrays_filename:
+    log_and_exit('--set_membership_arrays_filename must be specified')
+  elif os.path.exists(options.set_membership_arrays_filename):
+    log_and_exit('set_membership_arrays_filename `%s` already exists.' %
+      options.set_membership_arrays_filename)
+  return options
 
 def load_membership_file(filename):
   try:
@@ -44,23 +49,10 @@ def load_membership_file(filename):
     log_and_exit(
       'membership_filename `%s` does not exist.' % filename)
 
-#TODO move into __main__
-membership_fh, membership_filesize = load_membership_file(options.membership_filename)
-
-if not options.set_membership_arrays_filename:
-  log_and_exit('--set_memberhsip_arrays_filename must be specified')
-elif os.path.exists(options.set_membership_arrays_filename):
-  log_and_exit('set_membership_arrays_filename `%s` already exists.' %
-    options.set_membership_arrays_filename)
-#END#TODO
-
 # helper function to turn an iterable into a list of tuples
 in_pairs = lambda xs: [tuple(xs[i:i+2]) for i in range(0, len(xs), 2)]
 
-BUFFERSIZE = 1024 * 64
-SIZEOFINT = 4
-INTCOUNT = BUFFERSIZE / SIZEOFINT
-log.info("Reading in %d integers at a time" % INTCOUNT)
+
 
 def fill_buffer(fin, BUFFERSIZE):
   """Read `INTCOUNT` integers from file handle `fin` and return array of ints""" 
@@ -113,8 +105,6 @@ def load_or_enumerate_set_ids():
   log.info('%d unique set_ids in file' % len(set_ids))
   return set_ids
 
-set_ids = load_or_enumerate_set_ids()
-set_array_offsets = dict()
 
 
 def extract_membership(set_id_segment, membership_fh):
@@ -136,38 +126,51 @@ def extract_membership(set_id_segment, membership_fh):
     pass
   return set_membership
 
+
+BUFFERSIZE = 1024 * 64
+SIZEOFINT = 4
+INTCOUNT = BUFFERSIZE / SIZEOFINT
 SEGSIZE = 10000
-for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
-  log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
-  set_membership = extract_membership(set_id_segment, membership_fh)
 
-  lens = map(len, set_membership.values())
-  log.info('Processed `%d` total set_ids' % sum(lens))
-  log.info('The biggest set has `%d` members' % max(lens))
-
-  small_sets = 0
-  with open(options.set_membership_arrays_filename, 'ab+') as fout:
-    for set_id, user_ids in set_membership.iteritems():
-      # drop one member sets
-      if len(user_ids) <= 1:
-        small_sets += 1
-        continue
-
-      # add stop integer
-      user_ids += [0]
-
-      set_array_offsets[set_id] = file_offset = fout.tell()
-      print "Offset %d, set_id %s, about to write %d bytes" % (
-        file_offset, set_id, len(user_ids * 4)
-      )
-      user_id_array = array.array('I')
-      user_id_array.fromlist(user_ids)
-      user_id_array.tofile(fout)
-      print "Offset %d, set_id %s, %d actual bytes written" % (
-        fout.tell(), set_id, fout.tell() - file_offset
-      )
-    print "%d bytes written to %s" % (fout.tell(), options.set_membership_arrays_filename)
-  print "Skipped %d sets with 1 member" % small_sets
+if __name__ == '__main__':
+  options = parseargs()
+  membership_fh, membership_filesize = load_membership_file(options.membership_filename)
+  
+  set_ids = load_or_enumerate_set_ids()
+  set_array_offsets = dict()
+  
+  log.info("Reading in %d integers at a time" % INTCOUNT)
+  for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
+    log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
+    set_membership = extract_membership(set_id_segment, membership_fh)
+  
+    lens = map(len, set_membership.values())
+    log.info('Processed `%d` total set_ids' % sum(lens))
+    log.info('The biggest set has `%d` members' % max(lens))
+  
+    small_sets = 0
+    with open(options.set_membership_arrays_filename, 'ab+') as fout:
+      for set_id, user_ids in set_membership.iteritems():
+        # drop one member sets
+        if len(user_ids) <= 1:
+          small_sets += 1
+          continue
+  
+        # add stop integer
+        user_ids += [0]
+  
+        set_array_offsets[set_id] = file_offset = fout.tell()
+        print "Offset %d, set_id %s, about to write %d bytes" % (
+          file_offset, set_id, len(user_ids * 4)
+        )
+        user_id_array = array.array('I')
+        user_id_array.fromlist(user_ids)
+        user_id_array.tofile(fout)
+        print "Offset %d, set_id %s, %d actual bytes written" % (
+          fout.tell(), set_id, fout.tell() - file_offset
+        )
+      print "%d bytes written to %s" % (fout.tell(), options.set_membership_arrays_filename)
+    print "Skipped %d sets with 1 member" % small_sets
 
 #sys.exit(0) # SLIDING DEBUG START POINT
 # sanity check: does the visual output seem right?
