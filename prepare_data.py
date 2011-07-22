@@ -25,7 +25,7 @@ def parseargs():
   parser.add_argument('--membership-filename', type=str,
     help='(input) set membership binary image filename')
   parser.add_argument('--set-membership-arrays-filename', type=str,
-    help='(output) Filename for array of user_id arrays')
+    help='(output) Filename for array of member_id arrays')
   parser.add_argument('--member-index-filename', type=str,
     help='(output) Filename for index array into members_array')
   parser.add_argument('--set-id-filename', type=str,
@@ -62,7 +62,7 @@ def fill_buffer(fin, BUFFERSIZE):
 
 def enumerate_set_ids(fh, progress_func=lambda x: 0):
   """Return list of integers for set_ids from a file handle. This funtion
-  resets the file position. Assumes the input is (user_id, set_id) * N in
+  resets the file position. Assumes the input is (member_id, set_id) * N in
   binary.
   """
   fh.seek(0)
@@ -170,20 +170,20 @@ if __name__ == '__main__':
   
     small_sets = 0
     with open(options.set_membership_arrays_filename, 'ab+') as fout:
-      for set_id, user_ids in set_membership.iteritems():
-        if len(user_ids) <= 1: # drop one member sets
+      for set_id, member_ids in set_membership.iteritems():
+        if len(member_ids) <= 1: # drop one member sets
           small_sets += 1
           continue
   
-        user_ids += [0] # add stop integer
+        member_ids += [0] # add stop integer
   
         set_array_offsets[set_id] = file_offset = fout.tell()
         log.debug("Offset %d, set_id %s, about to write %d bytes" % (
-          file_offset, set_id, len(user_ids * 4)
+          file_offset, set_id, len(member_ids * 4)
         ))
-        user_id_array = array.array('I')
-        user_id_array.fromlist(user_ids)
-        user_id_array.tofile(fout)
+        member_id_array = array.array('I')
+        member_id_array.fromlist(member_ids)
+        member_id_array.tofile(fout)
         log.debug("Offset %d, set_id %s, %d actual bytes written" % (
           fout.tell(), set_id, fout.tell() - file_offset
         ))
