@@ -1,21 +1,12 @@
 import array
 import argparse
 import datetime
-import itertools
+from compat import itertools
 import logging
 import os.path
 import sys
 import struct
 
-try:
-  itertools.count(1, 1)
-except TypeError:
-  def _count(start=0, step=1):
-    n = start
-    while True:
-      yield n
-      n += step
-  itertools.count = _count
 
 logging.basicConfig()
 log = logging.getLogger('prepare_data')
