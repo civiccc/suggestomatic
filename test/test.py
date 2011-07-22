@@ -20,7 +20,7 @@ def generate_testing_data():
   user_likes_group = [[False] * NUM_GROUPS for x in range(NUM_USERS)]
 
   for x in range(NUM_USERS * NUM_GROUPS / FILL_FACTOR):
-    user_likes_group[random.randrange(0, NUM_USERS)][random.randrange(0, NUM_USERS)] = True
+    user_likes_group[random.randrange(1, NUM_USERS)][random.randrange(1, NUM_USERS)] = True
 
   return user_likes_group
 
