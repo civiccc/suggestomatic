@@ -1,3 +1,5 @@
+#!/usr/bin/python
+
 import array
 import argparse
 import datetime
@@ -36,16 +38,18 @@ def load_membership_file(filename):
   try:
     fh = open(filename, 'r')
     filesize = os.path.getsize(filename)
-    log.info('File size: %s' % filesize)
+    log.info('CSV membership input file size: %s bytes' % filesize)
     return fh, filesize
-  except IOError:
+  except (IOError, TypeError):
     log_and_exit(
       'membership_filename `%s` does not exist.' % filename)
 
 #TODO move into __main__
 membership_fh, membership_filesize = load_membership_file(options.membership_filename)
 
-if os.path.exists(options.set_membership_arrays_filename):
+if not options.set_membership_arrays_filename:
+  log_and_exit('--set_memberhsip_arrays_filename must be specified')
+elif os.path.exists(options.set_membership_arrays_filename):
   log_and_exit('set_membership_arrays_filename `%s` already exists.' %
     options.set_membership_arrays_filename)
 #END#TODO
@@ -92,6 +96,8 @@ def load_or_enumerate_set_ids():
   # binary array of unsigned integers
   set_ids_array = array.array('I')
 
+  if not options.set_id_filename:
+    log_and_exit('Must specify --set-id-filename')
   if not os.path.exists(options.set_id_filename):
     log.info('Enumerating set_ids from file -- this may take a while')
     set_ids = enumerate_set_ids(membership_fh, progress_func)
@@ -111,7 +117,7 @@ set_ids = load_or_enumerate_set_ids()
 set_array_offsets = dict()
 
 SEGSIZE = 10000
-for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(len(set_ids), SEGSIZE)):
+for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
   log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
 
   # reset data structures
@@ -129,17 +135,16 @@ for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(len(set_ids), SEGSIZ
       progress_func(readbytes, mb=100)
       if len(pairs) != (BUFFERSIZE / SIZEOFINT / 2):
         raise EOFError
-  except EOFError:
-    log.info('Hit EOF')
-    pass
-  total = sum(len(user_ids) for user_ids in set_membership.values())
-  log.info('Total user_ids: %d' % total)
-  log.info('Biggest set has %d users' %
-     max(len(user_ids) for user_ids in set_membership.values()))
-  sys.exit(0) # SLIDING DEBUG START POINT
+  except EOFError: pass
+
+  lens = map(len, set_membership.values(A))
+  log.info('Processed `%d` total set_ids and the biggest has `%d` members' % (
+      sum(lens), max(lens)
+  ))
+
 
   small_sets = 0
-  with open(options.set_memberhsip_arrays_filename, 'ab+') as fout:
+  with open(options.set_membership_arrays_filename, 'ab+') as fout:
     for set_id, user_ids in set_membership.iteritems():
       # drop one member sets
       if len(user_ids) <= 1:
@@ -159,15 +164,16 @@ for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(len(set_ids), SEGSIZ
       print "Offset %d, set_id %s, %d actual bytes written" % (
         fout.tell(), set_id, fout.tell() - file_offset
       )
-    print "%d bytes written to %s" % (fout.tell(), options.set_memberhsip_arrays_filename)
+    print "%d bytes written to %s" % (fout.tell(), options.set_membership_arrays_filename)
   print "Skipped %d sets with 1 member" % small_sets
 
+sys.exit(0) # SLIDING DEBUG START POINT
 # sanity check: does the visual output seem right?
 # integrity checks:
 #   * the byte before each offset should be 0 to indicate the end of the
 #     previous user_id array
 #TODO more integrity checks
-with open(options.set_memberhsip_arrays_filename, 'rb') as set_array_bin:
+with open(options.set_membership_arrays_filename, 'rb') as set_array_bin:
   for set_id, offset in set_array_offsets.iteritems():
     print '%d: %d' % (set_id, offset)
 
