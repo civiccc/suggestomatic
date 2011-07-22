@@ -59,7 +59,8 @@ def dump_recommendations(user_likes_group, recommendations_file_location):
            user_likes_group[user_id][group_id_2]:
           a_user_likes_both[group_id_1][group_id_2] += 1
   
-  # We make pairs of group_id,
+  # recommendations[x] has pairs (a, b) such that b users from group a also like
+  # group x.
   recommendations = [sorted(enumerate(a_user_likes_both[x]), key=lambda x:-x[1])
                       for x in range(NUM_GROUPS)]
 
