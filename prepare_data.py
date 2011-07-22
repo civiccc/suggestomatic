@@ -32,17 +32,23 @@ parser.add_argument('--set-id-filename', type=str,
 options = parser.parse_args()
 log.debug(options)
 
-try:
-  membership_fh = open(options.membership_filename, 'r')
-  membership_file_size = os.path.getsize(options.membership_filename)
-  log.info('File size: %s' % membership_file_size)
-except IOError:
-  log_and_exit(
-    'membership_filename `%s` does not exist.' % options.membership_filename)
+def load_membership_file(filename):
+  try:
+    fh = open(filename, 'r')
+    filesize = os.path.getsize(filename)
+    log.info('File size: %s' % filesize)
+    return fh, filesize
+  except IOError:
+    log_and_exit(
+      'membership_filename `%s` does not exist.' % filename)
+
+#TODO move into __main__
+membership_fh, membership_filesize = load_membership_file(options.membership_filename)
 
 if os.path.exists(options.set_membership_arrays_filename):
   log_and_exit('set_membership_arrays_filename `%s` already exists.' %
     options.set_membership_arrays_filename)
+#END#TODO
 
 # helper function to turn an iterable into a list of tuples
 in_pairs = lambda xs: [tuple(xs[i:i+2]) for i in range(0, len(xs), 2)]
@@ -79,7 +85,7 @@ def enumerate_set_ids(fh, progress_func=lambda x: 0):
 def progress_func(readbytes, mb=100):
   if readbytes % (BUFFERSIZE * 16 * mb) == 0:
     print "%d / %d bytes read, %.2f%% complete" % (
-      readbytes, membership_file_size, 100 * readbytes / float(membership_file_size)
+      readbytes, membership_filesize, 100 * readbytes / float(membership_filesize)
     )
 
 def load_or_enumerate_set_ids():
@@ -99,26 +105,27 @@ def load_or_enumerate_set_ids():
       set_ids_array.fromfile(fh, size / SIZEOFINT)
       set_ids = set_ids_array.tolist()
   log.info('%d unique set_ids in file' % len(set_ids))
+  return set_ids
 
-load_or_enumerate_set_ids()
+set_ids = load_or_enumerate_set_ids()
 set_array_offsets = dict()
-sys.exit(0)
 
 SEGSIZE = 10000
-offset = int(options.get('offset', 0))
-print "Using set_ids offset: %d" % offset
+#offset = int(options.get('offset', 0))
+offset = 0
+log.info("Using set_ids offset: %d" % offset)
 for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(offset, len(set_ids), SEGSIZE)):
-  print "Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE)
+  log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
 
   # reset data structures
   set_membership = dict((set_id, []) for set_id in set_id_segment)
   set_id_segment_set = set(set_id_segment)
-  fin.seek(0) # reset file
+  membership_fh.seek(0) # reset file
 
   # read entire data file until we're out
   try:
-    for readbytes in itertools.count(start=0, step=BUFFERSIZE):
-      pairs = in_pairs(fill_buffer(fin, BUFFERSIZE))
+    for readbytes in itertools.count(0, BUFFERSIZE):
+      pairs = in_pairs(fill_buffer(membership_fh, BUFFERSIZE))
       for user_id, set_id in pairs:
         if set_id in set_id_segment_set:
           set_membership[set_id].append(user_id)
@@ -126,11 +133,13 @@ for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(offset, len(set_ids)
       if len(pairs) != (BUFFERSIZE / SIZEOFINT / 2):
         raise EOFError
   except EOFError:
-    print "Hit EOF"
+    log.info('Hit EOF')
     pass
   total = sum(len(user_ids) for user_ids in set_membership.values())
-  print "Total user_ids: %d" % total
-  print "Biggest set has %d users" % max(len(user_ids) for user_ids in set_membership.values())
+  log.info('Total user_ids: %d' % total)
+  log.info('Biggest set has %d users' %
+     max(len(user_ids) for user_ids in set_membership.values()))
+  sys.exit(0) # SLIDING DEBUG START POINT
 
   small_sets = 0
   with open(options.set_memberhsip_arrays_filename, 'ab+') as fout:
