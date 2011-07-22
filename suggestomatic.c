@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <math.h>
@@ -10,6 +11,7 @@
 #define PACKAGE "mmap"
 #define STOP 0
 
+unsigned int set_intersection(unsigned int* set_a, unsigned int set_a_size, unsigned int* set_b, unsigned int set_b_size);
 /***
  * Samples only set_a, because it's large arrays for set_a that slow down the
  * process. 
@@ -23,13 +25,15 @@ unsigned short get_step(unsigned int set_size) {
   else                         { return 1000; }
 }
 
-unsigned int
-set_intersection(unsigned int* set_a, unsigned int set_size, unsigned int* set_b) {
+inline unsigned int
+set_intersection(unsigned int* set_a, unsigned int set_a_size, unsigned int*
+set_b, unsigned int set_b_size) {
   unsigned int a, b;
-  unsigned int step = get_step(set_size);
-  unsigned int* set_a_stop = set_a + set_size;
+  unsigned int step = get_step(set_a_size);
+  unsigned int* set_a_stop = set_a + set_a_size,
+              * set_b_stop = set_b + set_b_size;
   unsigned int intersections = 0;
-  while (set_a < set_a_stop) {
+  while (set_a < set_a_stop && set_b < set_b_stop) {
     a = *set_a;
     b = *set_b;
     if (a == b) {
@@ -50,7 +54,8 @@ test_set_intersection() {
   unsigned int set_a[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0};
   unsigned int set_a_size = 11;
   unsigned int set_b[] = {5, 6, 7, 8, 9, 10, 11, 12, 0};
-  unsigned int members_in_common = set_intersection(set_a, set_a_size, set_b);
+  unsigned int set_b_size = sizeof(set_b) / sizeof(set_b[0]);
+  unsigned int members_in_common = set_intersection(set_a, set_a_size, set_b, set_b_size);
   if (members_in_common != 6) {
     printf("Got %i instead of 6\n", members_in_common);
     return -1;
@@ -163,33 +168,35 @@ main(int argc, char *argv[]) {
   const FILE* fout = fopen(suggestions_filename, "a+");
   unsigned long counter = 0, intersection_count;
   int started_at = (int)time(NULL);
-  unsigned int set_id_a, set_id_b, set_id_length;
+  unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
 
   printf("%9s %9s %20s %20s %20s \n", "id a", "id b", "comparisons", "good matches", "time elapsed (s)");
   for (int a = 0; a < set_id_count; a++) {
     set_id_a = set_ids[a];
-    set_id_length = indexptr[set_ids[a+1]] - indexptr[set_id_a];
+    set_a_length = indexptr[set_ids[a+1]] - indexptr[set_id_a];
    
-    if (set_id_length == 0) { continue; }
-    printf("Set `%d` length: %d (sample size: %d)\n", set_id_a, (int)(set_id_length), get_step(set_id_length));
+    if (set_a_length == 0) { continue; }
+    printf("Set `%d` length: %d (sample size: %d)\n", set_id_a, (int)(set_a_length), get_step(set_a_length));
 
     // goodmatches is a basic heuristic for preventing any set_a's iteration
     // from taking too long. Once sampling is effective, this can be removed
     unsigned short int goodmatches = 0;
     for (int b = a + 1; b < set_id_count; b++) {
       set_id_b = set_ids[b];
+      set_b_length = indexptr[set_ids[b+1]] - indexptr[set_id_b];
 
       // offsets are in bytes but pointer arithmetic calls for words
       intersection_count = set_intersection(
         arraysptr + indexptr[set_id_a] / sizeof(unsigned int),
-        set_id_length,
-        arraysptr + indexptr[set_id_b] / sizeof(unsigned int)
+        set_a_length,
+        arraysptr + indexptr[set_id_b] / sizeof(unsigned int),
+        set_b_length
       );
 
       // record "good" matches; number of members in common is more than 10%
       // of the first set
-      if ((float)(intersection_count * get_step(set_id_length)) 
-           >= (float) set_id_length * .10) {
+      if ((float)(intersection_count * get_step(set_a_length)) 
+           >= (float) set_a_length * .10) {
         write_result(fout, set_id_a, set_id_b, intersection_count);
         ++goodmatches;
         // early out when we have "enough" good matches
