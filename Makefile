@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -std=c99 -ggdb
+CFLAGS=-Wall -std=c99 -ggdb -O3
 
 suggestomatic: suggestomatic.o
 clean:
