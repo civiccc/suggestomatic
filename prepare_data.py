@@ -111,10 +111,7 @@ set_ids = load_or_enumerate_set_ids()
 set_array_offsets = dict()
 
 SEGSIZE = 10000
-#offset = int(options.get('offset', 0))
-offset = 0
-log.info("Using set_ids offset: %d" % offset)
-for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(offset, len(set_ids), SEGSIZE)):
+for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(len(set_ids), SEGSIZE)):
   log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
 
   # reset data structures
