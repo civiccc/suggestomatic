@@ -84,7 +84,7 @@ def enumerate_set_ids(fh, progress_func=lambda x: 0):
     set_ids.update(set(new_set_ids))
     progress_func(readbytes, mb=100)
     if len(ints) != (BUFFERSIZE / SIZEOFINT):
-      return tuple(set_ids)
+      return list(set_ids)
 
 def progress_func(readbytes, mb=100):
   if readbytes % (BUFFERSIZE * 16 * mb) == 0:
@@ -137,7 +137,7 @@ for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEG
         raise EOFError
   except EOFError: pass
 
-  lens = map(len, set_membership.values(A))
+  lens = map(len, set_membership.values())
   log.info('Processed `%d` total set_ids and the biggest has `%d` members' % (
       sum(lens), max(lens)
   ))
@@ -167,7 +167,7 @@ for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEG
     print "%d bytes written to %s" % (fout.tell(), options.set_membership_arrays_filename)
   print "Skipped %d sets with 1 member" % small_sets
 
-sys.exit(0) # SLIDING DEBUG START POINT
+#sys.exit(0) # SLIDING DEBUG START POINT
 # sanity check: does the visual output seem right?
 # integrity checks:
 #   * the byte before each offset should be 0 to indicate the end of the
@@ -187,14 +187,15 @@ max_set_id = max(map(int, set_array_offsets.keys()))
 print "max set_id: %d" % max_set_id
 
 
-index_filename = options.get('indexfile', 'set_array_index.bin')
-with open(index_filename, 'wb') as indexfile:
-  index_list = [
+with open(options.member_index_filename, 'wb') as indexfile:
+  log.info('Generating index file `%s`.' % options.member_index_filename)
+  index_list = (
     set_array_offsets.get(set_id, 0)
     for set_id
     in xrange(max(set_array_offsets.keys()))
-  ]
+  )
   index_array = array.array('I')
   index_array.fromlist(index_list)
   index_array.tofile(indexfile)
+  log.info('Finished generating index file.')
 
