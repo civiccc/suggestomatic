@@ -25,20 +25,22 @@ unsigned short get_step(unsigned int set_size) {
 
 unsigned int
 set_intersection(unsigned int* set_a, unsigned int set_size, unsigned int* set_b) {
+  unsigned int a, b;
   unsigned int step = get_step(set_size);
   unsigned int* set_a_stop = set_a + set_size;
   unsigned int intersections = 0;
   while (set_a < set_a_stop) {
-    if (*set_a == *set_b) {
+    a = *set_a;
+    b = *set_b;
+    if (a == b) {
       intersections++;
-      set_a++;// += random() % step;
+      set_a++;
       set_b++;
-    } else if (*set_a < *set_b) {
-      set_a++;// += random() % step;
-    } else if (*set_a > *set_b) {
+    } else if (a < b) {
+      set_a++;
+    } else {
       set_b++;
     }
-    if (*set_a == STOP || *set_b == STOP) {return intersections;}
   }
   return intersections;
 }
@@ -186,7 +188,8 @@ main(int argc, char *argv[]) {
 
       // record "good" matches; number of members in common is more than 10%
       // of the first set
-      if (intersection_count * get_step(set_id_length) >= set_id_length * .10) {
+      if ((float)(intersection_count * get_step(set_id_length)) 
+           >= (float) set_id_length * .10) {
         write_result(fout, set_id_a, set_id_b, intersection_count);
         ++goodmatches;
         // early out when we have "enough" good matches
