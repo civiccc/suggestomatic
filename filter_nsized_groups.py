@@ -2,6 +2,16 @@
 import struct
 import sys
 
+# filter_nsized_groups: Given a CSV file of (user, group) pairs, each indicating
+# that user USER belongs to group GROUP, do two things:
+#
+# 1. Remove all groups with a size that fall under a threshold, specified in 
+#    arguments passed to the file (defaults to 1).
+#
+# 2. Writes the resulting pairs to a new binary file, with a name specified in
+#    the arguments passed in.
+
+# Parses command line arguments. See --help screen for more information.
 def parse_arguments():
   options = {}
   for arg in sys.argv[1:]:
@@ -9,6 +19,10 @@ def parse_arguments():
       print "usage: ./filter_nsized_causes.py --outfile=OUTPUT [--n=N] [--infile=INPUT]"
       print ""
       print "n: threshold of group size to include in output file. (default = 1)"
+      print ""
+      print "outfile: location of the output of this file."
+      print ""
+      print "infile: CSV of (user, group) pairs."
 
       exit(0)
     try:
@@ -20,14 +34,19 @@ def parse_arguments():
 
   return options
 
-class FilterGroup:
+class FilterGroups:
+  # OPTIONS is a dictionary of settings.
+  #
+  # options['infile']  : The input file. Required.
+  # options['outfile'] : The output file. Required.
+  # options['n']       : Group size threshold. Defaults to 1.
   def __init__(self, options):
+    self.GROUP_IDX = 1
+
     self.options = options
-    self.CAUSE_IDX = 1
     self.threshold = int(self.options.get('n', 1))
 
-    self.open_files()
-
+    self.fin, self.fout = self.open_files()
     groups_members = self.count_membership(self.fin)
 
     # Blacklist small groups.
@@ -37,18 +56,21 @@ class FilterGroup:
 
   # Open input and output files.
   def open_files(self):
-    self.fout = open(self.options['outfile'], 'wb+')
+    fout = open(self.options['outfile'], 'wb+')
+    fin = None
     try:
-      self.fin = open(self.options['infile'], 'r')
+      fin = open(self.options['infile'], 'r')
     except KeyError:
-      self.fin = sys.stdin
+      fin = sys.stdin
+
+    return (fin, fout)
 
   # Return a dictionary mapping groups to member count.
   def count_membership(self, input_file):
     groups_members = {}
     for i, line in enumerate(input_file):
       try: 
-        group_id = int(line[:-1].split(',')[self.CAUSE_IDX])
+        group_id = int(line[:-1].split(',')[self.GROUP_IDX])
       except IndexError: 
         print "CSV file is improperly formatted on line %d (no comma found)" % i
         continue
@@ -77,4 +99,4 @@ class FilterGroup:
       if i % 1000000 == 0: print "Write progress: %d" % i
 
 if __name__ == "__main__":
-  f = FilterGroup(parse_arguments())
+  f = FilterGroups(parse_arguments())
