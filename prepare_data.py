@@ -84,7 +84,7 @@ def enumerate_set_ids(fh, progress_func=lambda x: 0):
     set_ids.update(set(new_set_ids))
     progress_func(readbytes, mb=100)
     if len(ints) != (BUFFERSIZE / SIZEOFINT):
-      return tuple(set_ids)
+      return list(set_ids)
 
 def progress_func(readbytes, mb=100):
   if readbytes % (BUFFERSIZE * 16 * mb) == 0:
@@ -116,32 +116,34 @@ def load_or_enumerate_set_ids():
 set_ids = load_or_enumerate_set_ids()
 set_array_offsets = dict()
 
-SEGSIZE = 10000
-for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
-  log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
 
-  # reset data structures
+def extract_membership(set_id_segment, membership_fh):
   set_membership = dict((set_id, []) for set_id in set_id_segment)
   set_id_segment_set = set(set_id_segment)
   membership_fh.seek(0) # reset file
 
-  # read entire data file until we're out
+  # read entire data file until we've hit EOF
   try:
     for readbytes in itertools.count(0, BUFFERSIZE):
       pairs = in_pairs(fill_buffer(membership_fh, BUFFERSIZE))
-      for user_id, set_id in pairs:
+      for member_id, set_id in pairs:
         if set_id in set_id_segment_set:
-          set_membership[set_id].append(user_id)
+          set_membership[set_id].append(member_id)
       progress_func(readbytes, mb=100)
       if len(pairs) != (BUFFERSIZE / SIZEOFINT / 2):
         raise EOFError
-  except EOFError: pass
+  except EOFError:
+    pass
+  return set_membership
 
-  lens = map(len, set_membership.values(A))
-  log.info('Processed `%d` total set_ids and the biggest has `%d` members' % (
-      sum(lens), max(lens)
-  ))
+SEGSIZE = 10000
+for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
+  log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
+  set_membership = extract_membership(set_id_segment, membership_fh)
 
+  lens = map(len, set_membership.values())
+  log.info('Processed `%d` total set_ids' % sum(lens))
+  log.info('The biggest set has `%d` members' % max(lens))
 
   small_sets = 0
   with open(options.set_membership_arrays_filename, 'ab+') as fout:
@@ -167,7 +169,7 @@ for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEG
     print "%d bytes written to %s" % (fout.tell(), options.set_membership_arrays_filename)
   print "Skipped %d sets with 1 member" % small_sets
 
-sys.exit(0) # SLIDING DEBUG START POINT
+#sys.exit(0) # SLIDING DEBUG START POINT
 # sanity check: does the visual output seem right?
 # integrity checks:
 #   * the byte before each offset should be 0 to indicate the end of the
@@ -187,8 +189,8 @@ max_set_id = max(map(int, set_array_offsets.keys()))
 print "max set_id: %d" % max_set_id
 
 
-index_filename = options.get('indexfile', 'set_array_index.bin')
-with open(index_filename, 'wb') as indexfile:
+with open(options.member_index_filename, 'wb') as indexfile:
+  log.info('Generating index file `%s`.' % options.member_index_filename)
   index_list = [
     set_array_offsets.get(set_id, 0)
     for set_id
@@ -197,4 +199,5 @@ with open(index_filename, 'wb') as indexfile:
   index_array = array.array('I')
   index_array.fromlist(index_list)
   index_array.tofile(indexfile)
+  log.info('Finished generating index file.')
 
