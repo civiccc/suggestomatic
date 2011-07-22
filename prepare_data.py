@@ -52,8 +52,6 @@ def load_membership_file(filename):
 # helper function to turn an iterable into a list of tuples
 in_pairs = lambda xs: [tuple(xs[i:i+2]) for i in range(0, len(xs), 2)]
 
-
-
 def fill_buffer(fin, BUFFERSIZE):
   """Read `INTCOUNT` integers from file handle `fin` and return array of ints""" 
   set_id_array = array.array('I')
@@ -80,9 +78,9 @@ def enumerate_set_ids(fh, progress_func=lambda x: 0):
 
 def progress_func(readbytes, mb=100):
   if readbytes % (BUFFERSIZE * 16 * mb) == 0:
-    print "%d / %d bytes read, %.2f%% complete" % (
+    log.info("%d / %d bytes read, %.2f%% complete" % (
       readbytes, membership_filesize, 100 * readbytes / float(membership_filesize)
-    )
+    ))
 
 def load_or_enumerate_set_ids():
   # binary array of unsigned integers
@@ -105,8 +103,6 @@ def load_or_enumerate_set_ids():
   log.info('%d unique set_ids in file' % len(set_ids))
   return set_ids
 
-
-
 def extract_membership(set_id_segment, membership_fh):
   set_membership = dict((set_id, []) for set_id in set_id_segment)
   set_id_segment_set = set(set_id_segment)
@@ -126,6 +122,17 @@ def extract_membership(set_id_segment, membership_fh):
     pass
   return set_membership
 
+def verify_results(arrays_filename, set_array_offsets):
+  """Integrity check: the byte before each offset should be a 0 to indicate the
+  end of the previous array"""
+  with open(arrays_filename, 'rb') as set_array_bin:
+    for set_id, offset in set_array_offsets.iteritems():
+      log.debug('%d: %d' % (set_id, offset))
+      if offset - SIZEOFINT < 0: continue
+      set_array_bin.seek(offset - SIZEOFINT)
+      zero_array = array.array('I')
+      zero_array.fromfile(set_array_bin, 1)
+      assert zero_array[0] == 0
 
 BUFFERSIZE = 1024 * 64
 SIZEOFINT = 4
@@ -160,33 +167,20 @@ if __name__ == '__main__':
         user_ids += [0]
   
         set_array_offsets[set_id] = file_offset = fout.tell()
-        print "Offset %d, set_id %s, about to write %d bytes" % (
+        log.debug("Offset %d, set_id %s, about to write %d bytes" % (
           file_offset, set_id, len(user_ids * 4)
-        )
+        ))
         user_id_array = array.array('I')
         user_id_array.fromlist(user_ids)
         user_id_array.tofile(fout)
-        print "Offset %d, set_id %s, %d actual bytes written" % (
+        log.debug("Offset %d, set_id %s, %d actual bytes written" % (
           fout.tell(), set_id, fout.tell() - file_offset
-        )
-      print "%d bytes written to %s" % (fout.tell(), options.set_membership_arrays_filename)
-    print "Skipped %d sets with 1 member" % small_sets
-
-#sys.exit(0) # SLIDING DEBUG START POINT
-# sanity check: does the visual output seem right?
-# integrity checks:
-#   * the byte before each offset should be 0 to indicate the end of the
-#     previous user_id array
-#TODO more integrity checks
-with open(options.set_membership_arrays_filename, 'rb') as set_array_bin:
-  for set_id, offset in set_array_offsets.iteritems():
-    print '%d: %d' % (set_id, offset)
-
-    if offset - SIZEOFINT < 0: continue
-    set_array_bin.seek(offset - SIZEOFINT)
-    zero_array = array.array('I')
-    zero_array.fromfile(set_array_bin, 1)
-    assert zero_array[0] == 0
+        ))
+      log.info("%d bytes written to %s" %
+        (fout.tell(), options.set_membership_arrays_filename)
+      )
+    log.info("Skipped %d sets with 1 member" % small_sets)
+  verify_results(options.set_membership_arrays_filename, set_array_offsets)
 
 max_set_id = max(map(int, set_array_offsets.keys()))
 print "max set_id: %d" % max_set_id
