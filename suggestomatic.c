@@ -193,10 +193,9 @@ main(int argc, char *argv[]) {
         set_b_length
       );
 
-      // record "good" matches; number of members in common is more than 10%
-      // of the first set
-      if ((float)(intersection_count * get_step(set_a_length)) 
-           >= (float) set_a_length * .10) {
+      // record "good" matches
+      //TODO this threshold should depend on the size of set_a
+      if (intersection_count > 100) {
         write_result(fout, set_id_a, set_id_b, intersection_count);
         ++goodmatches;
         // early out when we have "enough" good matches
@@ -204,8 +203,8 @@ main(int argc, char *argv[]) {
       }
 
       // visual output for progress
-      if (++counter % 10000 == 0) {
-        if (counter % 100000 == 0) { print_progress_headers(); }
+      if (++counter % 100000 == 0) {
+        if (counter % 1000000 == 0) { print_progress_headers(); }
         print_progress(set_id_a, set_id_b, counter, goodmatches, started_at);
       }
     }
