@@ -1,13 +1,13 @@
 #!/usr/bin/python
 
-import array
 import argparse
+import array
 import datetime
 from compat import itertools
 import logging
 import os.path
-import sys
 import struct
+import sys
 
 
 logging.basicConfig()
@@ -22,14 +22,16 @@ def log_and_exit(msg, error_code=(-1)):
 def parseargs():
   parser = argparse.ArgumentParser(
     description="Prepare Suggestomatic data files from set membership CSV dump")
-  parser.add_argument('--membership-filename', type=str,
-    help='(input) set membership binary image filename')
-  parser.add_argument('--set-membership-arrays-filename', type=str,
-    help='(output) Filename for array of member_id arrays')
-  parser.add_argument('--member-index-filename', type=str,
-    help='(output) Filename for index array into members_array')
-  parser.add_argument('--set-id-filename', type=str,
-    help='(output / input) Filename for array of set_ids')
+
+  args = (
+    ('membership-filename', '(i) set membership binary image filename'),
+    ('set-membership-arrays-filename', '(o) Array of member_id arrays filename'),
+    ('member-index-filename', '(o) Index array into member array filename'),
+    ('set-id-filename', '(i/o) Array of set_ids filename')
+  )
+  for switch, help in args:
+    parser.add_argument('--%s' % switch, type=str, help=help)
+
 
   options = parser.parse_args()
   if not options.set_membership_arrays_filename:
