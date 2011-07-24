@@ -19,7 +19,8 @@ unsigned int set_intersection(unsigned int* set_a, unsigned int set_a_size, unsi
 
 //TODO this would be better as a continuous function so that each set_a iteration
 // takes as close to the same amount of time as possible
-unsigned short get_step(unsigned int set_size) {
+unsigned short
+get_step(unsigned int set_size) {
   if      (set_size < 100000)  { return 1; }
   else if (set_size < 1000000) { return 100; }
   else                         { return 1000; }
@@ -29,17 +30,17 @@ inline unsigned int
 set_intersection(unsigned int* set_a, unsigned int set_a_size, unsigned int*
 set_b, unsigned int set_b_size) {
   unsigned int a, b;
-  unsigned int step = get_step(set_a_size);
   unsigned int *set_a_stop = set_a + set_a_size,
                *set_b_stop = set_b + set_b_size;
   unsigned int intersections = 0;
   while (set_a < set_a_stop && set_b < set_b_stop) {
+    // caching these derefences makes it much faster
     a = *set_a;
     b = *set_b;
     if (a > b) {
       ++set_b;
     } else if (a == b) {
-      intersections++;
+      ++intersections;
       ++set_a;
       ++set_b;
     } else {
@@ -141,7 +142,7 @@ main(int argc, char *argv[]) {
        *set_members_filename = argv[3],
        *suggestions_filename = argv[4];
   unsigned int begin_at = 0;
-  if (argc > 4) {
+  if (argc > 5) {
     begin_at = atoi(argv[5]);
   }
   printf("Beginning at set id %d", begin_at);
@@ -181,14 +182,21 @@ main(int argc, char *argv[]) {
     set_a_length = indexptr[set_ids[a+1]] - indexptr[set_id_a];
    
     if (set_a_length == 0) { continue; }
-    printf("Set `%d` length: %d (sample size: %d)\n", set_id_a, (int)(set_a_length), get_step(set_a_length));
 
     // goodmatches is a basic heuristic for preventing any set_a's iteration
     // from taking too long. Once sampling is effective, this can be removed
     unsigned short int goodmatches = 0;
+    // starting randomly in tihe set id list will make sure we don't always
+    // compare the first elements of the array and possibly never even get to
+    // the last elements
+    unsigned int random_id_offset = rand() % set_id_count;
+    unsigned int set_b_index;
+    printf("Set `%d` length: %d (sample size: %d) random offset: %d \n", set_id_a, (int)(set_a_length), get_step(set_a_length), random_id_offset);
     for (int b = a + 1; b < set_id_count; b++) {
-      set_id_b = set_ids[b];
-      set_b_length = indexptr[set_ids[b+1]] - indexptr[set_id_b];
+      // wrap around back to the start if the offset is too large
+      set_b_index = (random_id_offset + b) % set_id_count;
+      set_id_b = set_ids[set_b_index];
+      set_b_length = indexptr[set_b_index+1] - indexptr[set_id_b];
 
       // offsets are in bytes but pointer arithmetic calls for words
       intersection_count = set_intersection(
