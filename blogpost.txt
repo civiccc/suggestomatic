@@ -7,7 +7,10 @@ suggestions based on information about you or information mined from groups of
 users has become a staple in content discovery. So how hard is it to build a
 rudimentary recommendation engine from scratch? For our most recent Hackathon,
 this is what I set out to do: build a modest "You might like these Causes"
-feature.
+feature.  It's worth mentioning that the Cause membership data set is
+911,000,000 records, about 600,000 unique causes, 150,000,000 unique
+registered users and by FAR the largest data set that I've ever worked with --
+and also what made it an interesting problem.
 
 There are two different types of collaborative filters that would accomplish what
 is needed: item based (purely a "this is how a bunch of other people are
@@ -15,21 +18,14 @@ related to this item") and user based (built on item based, but gives extra
 weight to users that act similarly to you). Because it was a Hackathon and I'd
 have to build the item based filter first, I scoped the project to just do that.
 The crux of an item based collaborative filter is a similarity matrix where each
-set member is scored against every other set member.
-For Causes, the scoring function needed to show how related two Causes are,
-and the input data set is the list of all Cause memberships. It's worth
-mentioning that the Cause membership data set is 911,000,000 records, about
-600,000 unique causes, 150,000,000 unique registered users and by FAR the
-largest data set that I've ever worked with -- and also what made it an
-interesting problem.
-
-Starting simple, I made the scoring function "members in common". Two causes
-with a large number of overlapping users would get a high score. As a proof of
-concept, I made a Ruby script that queried the cause_membership database
-with two cause_ids and did a self join to calculate the member set intersection.
-While it produced good results (animal Causes seemed related to other animal
-Causes, Causes with French titles scored high with other French Causes), it was
-slow. I mean, really slow. Would-take-on-the-order-of-years-to-finish slow.
+set member is compared against each other set member and a score is calculated.
+For Causes, the the scoring function needed to show how related two Causes are,
+and the input data set is the list of all Cause memberships. "Members in common"
+seemed like a good enough scoring function, so I made a proof of concept Ruby
+script that queried the cause_membership database with two cause_ids and did a
+self join to calculate the member set intersection.  While it produced good
+results (topic and language matched on first glance) it was really slow -- on
+the order of two years slow.
 
 So I got a bigger hammer -- the C hammer (I was really hoping I could work an
 MC Hammer joke in here somehow). I knew that a lot of the overhead of the proof
