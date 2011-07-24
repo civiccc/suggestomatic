@@ -74,9 +74,6 @@ I stored every result, I'd need on the order of (4 bytes/int * 3 ints) * (1/2)
 you only ever want the top 25 - 100 recommendations. So, the first
 deviation from completeness was to only write results if the score was at least
 100 and to also stop doing comparisons once 100 "good" results have been found.
-Is this perfect? Not by a long shot. There's a strong bias towards older Causes,
-as they are compared earliest. This can be corrected by randomizing the order in
-which Causes are compared.** 
 
 The second bottleneck was that a large `cause_a` will bring the process to an
 almost standstill. A 3,500,000 member cause will need to walk down a significant
@@ -94,8 +91,9 @@ Interesting take-aways:
   * n^2 gets big really quickly. If the number of unique Causes were an order
     of magnitude bigger, this process probably wouldn't be feasible without
     massive parallelization. Which is completely possible, by the way -- this
-    is a very parallelizable problem. A quick first pass at that might be
-    allowing `suggestomatic` to take start and end IDs for the outer loop.***
+    is a very parallelizable problem. There's already begin_at and end_at
+    parameters, so it should be easy to spin up a few EC2 instances and run in
+    parallel
   * Python has pretty good binary support. array.array is very easy to work
     with; all I needed was .fromlist() and .tofile()
   * C is really, really fast. We all run really fast computers, and our modern
@@ -115,6 +113,3 @@ If any of this sounds interesting to you, we're hiring! (cause.com/jobs)
 
 * Turns out plenty of more clever algorithms that can intersect sets quicker.
   We've got an open issue for investigating quicker alternatives (https://github.com/causes/suggestomatic/issues/1)
-** We've got an open issue for randomizing the list
-  https://github.com/causes/suggestomatic/issues/5
-*** Issue for that one too https://github.com/causes/suggestomatic/issues/6
