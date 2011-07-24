@@ -9,14 +9,14 @@ rudimentary recommendation engine from scratch? For our most recent Hackathon,
 this is what I set out to do: build a modest "You might like these Causes"
 feature.
 
-There's two different types of collaborative filters that would accomplish what
+There are two different types of collaborative filters that would accomplish what
 is needed: item based (purely a "this is how a bunch of other people are
 related to this item") and user based (built on item based, but gives extra
 weight to users that act similarly to you). Because it was a Hackathon and I'd
 have to build the item based filter first, I scoped the project to just do that.
 The crux of an item based collaborative filter is a similarity matrix where each
-set member is compared against each other set member and a score is calculated.
-For Causes, the the scoring function needed to show how related two Causes are,
+set member is scored against every other set member.
+For Causes, the scoring function needed to show how related two Causes are,
 and the input data set is the list of all Cause memberships. It's worth
 mentioning that the Cause membership data set is 911,000,000 records, about
 600,000 unique causes, 150,000,000 unique registered users and by FAR the
@@ -65,8 +65,7 @@ At the end of the data preparation step, we generate:
 
 The total memory requirement to hold this data is manageable on modern systems.
 Creating the C engine to use this data was fairly straightforward: load all the
-data files into memory with mmap(2) and start comparing each Cause to each
-other.
+data files into memory with mmap(2) and start comparing every pair of Causes.
 
 After an initial run, I noticed a few bottlenecks. First, at n^2 comparisons, if
 I stored every result, I'd need on the order of (4 bytes/int * 3 ints) * (1/2)
@@ -75,9 +74,9 @@ you only ever want the top 25 - 100 recommendations. So, the first
 deviation from completeness was to only write results if the score was at least
 100 and to also stop doing comparisons once 100 "good" results have been found.
 
-The second bottleneck was that a large `cause_a` will bring the process to an
-almost standstill. A 3,500,000 member cause will need to walk down a significant
-portion of that list against every other cause -- 3.5m * 600k is, yet another,
+The second bottleneck was that a large `cause_a` will bring the process to a
+near standstill. A 3,500,000 member cause will need to walk down a significant
+portion of that list against every other cause -- 3.5m * 600k is yet another
 number that is way, way, way too big. The "save 100 with scores above 100"
 remedied this problem pretty handily, large Causes also hit 100 scores pretty
 quickly.
@@ -111,5 +110,5 @@ Interesting take-aways:
 
 If any of this sounds interesting to you, we're hiring! (cause.com/jobs)
 
-* Turns out plenty of more clever algorithms that can intersect sets quicker.
+* It turns out there are plenty of more clever algorithms that can intersect sets quicker.
   We've got an open issue for investigating quicker alternatives (https://github.com/causes/suggestomatic/issues/1)
