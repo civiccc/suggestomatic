@@ -140,6 +140,11 @@ main(int argc, char *argv[]) {
        *set_index_filename = argv[2],
        *set_members_filename = argv[3],
        *suggestions_filename = argv[4];
+  unsigned int begin_at = 0;
+  if (argc > 4) {
+    begin_at = atoi(argv[5]);
+  }
+  printf("Beginning at set id %d", begin_at);
 
   struct fileinfo set_ids_file = load_binary_file(set_ids_filename);
   unsigned int *set_ids = (unsigned int*)(set_ids_file.head);
@@ -171,7 +176,7 @@ main(int argc, char *argv[]) {
   unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
 
   printf("%9s %9s %20s %20s %20s \n", "id a", "id b", "comparisons", "good matches", "time elapsed (s)");
-  for (int a = 0; a < set_id_count; a++) {
+  for (int a = begin_at; a < set_id_count; a++) {
     set_id_a = set_ids[a];
     set_a_length = indexptr[set_ids[a+1]] - indexptr[set_id_a];
    
