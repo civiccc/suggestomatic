@@ -157,28 +157,28 @@ SEGSIZE = 10000
 if __name__ == '__main__':
   options = parseargs()
   membership_fh, membership_filesize = load_membership_file(options.membership_filename)
-  
+
   set_ids = load_or_enumerate_set_ids()
   set_array_offsets = dict()
-  
+
   log.info("Reading in %d integers at a time" % INTCOUNT)
   for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
     log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
     set_membership = extract_membership(set_id_segment, membership_fh)
-  
+
     lens = map(len, set_membership.values())
     log.info('Processed `%d` total set_ids' % sum(lens))
     log.info('The biggest set has `%d` members' % max(lens))
-  
+
     small_sets = 0
     with open(options.set_membership_arrays_filename, 'ab+') as fout:
       for set_id, member_ids in set_membership.iteritems():
         if len(member_ids) <= 1: # drop one member sets
           small_sets += 1
           continue
-  
+
         member_ids += [0] # add stop integer
-  
+
         set_array_offsets[set_id] = file_offset = fout.tell()
         log.debug("Offset %d, set_id %s, about to write %d bytes" % (
           file_offset, set_id, len(member_ids * 4)
