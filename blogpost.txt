@@ -49,14 +49,13 @@ parse the two integers, and write them to file as integers (8 bytes per record
 as opposed to the ASCII representation of the numbers). This got my total input
 size down to about 5.4 GB -- much better, but still in (cause_id, user_id)
 tuples. To build membership arrays comprised of just user_ids, I needed another
-data massaging step. Because 5.4 GB was ALSO more memory than I had, I made loop
+data massaging step. Because 5.4 GB was ALSO more memory than I had, I made a loop
 that iterated over segments of 25,000 cause_ids at a time and built membership
 arrays for just that segment. I was also able to throw away some data: about
 15% of our Causes only have the creating member; I dropped those because they
 wouldn't add much value but would significantly cut down on CPU cost (for those
 of you who haven't done the mental math, 600,000 ^ 2 * (1/2) is 180,000,000,000
 comparisons, and I'll do anything I can do to cut that number down).
-i
 
 At the end of the data preparation step, we generate:
  * data file -- 2.54 GB, array of arrays of user ids
@@ -87,7 +86,7 @@ remedied this problem pretty handily, large Causes also hit 100 scores pretty
 quickly.
 
 At this point, I call it version 1. It's able to do 30 Causes per minute, so a
-complete refresh of our data in about 9 days. It's perfect, but it's a good
+complete refresh of our data in about 9 days. It's not perfect, but it's a good
 start, and we'll be able to fix problems as we find them and make other
 improvements as we go.
 
