@@ -10,13 +10,13 @@
 
 inline unsigned int
 set_intersection(
-    unsigned int* set_a,
+    const unsigned int* set_a,
     unsigned int set_a_size,
-    unsigned int* set_b,
+    const unsigned int* set_b,
     unsigned int set_b_size) {
   unsigned int a, b;
-  unsigned int *set_a_stop = set_a + set_a_size,
-               *set_b_stop = set_b + set_b_size;
+  const unsigned int *set_a_stop = set_a + set_a_size,
+                     *set_b_stop = set_b + set_b_size;
   unsigned int intersections = 0;
   while (set_a < set_a_stop && set_b < set_b_stop) {
     // caching these derefences makes it much faster
@@ -99,7 +99,7 @@ print_progress(
     unsigned short int goodmatches,
     int started_at) {
   printf(
-  "%9d %9d %20lu %20lu %20d\n", 
+  "%9d %9d %20lu %20d %20d\n", 
     set_id_a,
     set_id_b,
     counter,
@@ -113,7 +113,7 @@ first_10_elements(unsigned int *head, char *filename) {
   printf("Printing first 10 elements of %s\n", filename);
   unsigned int *limit = head + 10;
   for (; head < limit; head++) {
-    printf("0x%zx: %u\n", head, *head);
+    printf("0x%p: %u\n", head, *head);
   }
   printf("\n");
 }
@@ -161,7 +161,7 @@ main(int argc, char *argv[]) {
   // visual inspection sanity check
   first_10_elements((unsigned int*)arrays.head, set_members_filename);
 
-  const FILE *fout = fopen(suggestions_filename, "a+");
+  FILE *fout = fopen(suggestions_filename, "a+");
   unsigned long counter = 0, intersection_count;
   int started_at = (int)time(NULL);
   unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
