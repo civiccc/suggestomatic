@@ -3,6 +3,7 @@
 import argparse
 import array
 import datetime
+import collections
 from compat import itertools
 import logging
 import os.path
@@ -13,7 +14,6 @@ import sys
 logging.basicConfig()
 log = logging.getLogger('prepare_data')
 log.setLevel(logging.INFO)
-log.setLevel(logging.DEBUG)
 
 def log_and_exit(msg, error_code=(-1)):
   log.error(msg)
@@ -24,6 +24,7 @@ def parseargs():
     description="Prepare Suggestomatic data files from set membership CSV dump")
 
   args = (
+    ('membership-csv', '(i) set membership CSV of form (user_id, set_id)'),
     ('membership-filename', '(i) set membership binary image filename'),
     ('set-membership-arrays-filename', '(o) Array of member_id arrays filename'),
     ('member-index-filename', '(o) Index array into member array filename'),
@@ -31,9 +32,15 @@ def parseargs():
   )
   for switch, help in args:
     parser.add_argument('--%s' % switch, type=str, help=help)
+  parser.add_argument('--small-group-threshold', type=int, default=1,
+    help="Drop groups with less than or equal to this many members")
 
 
   options = parser.parse_args()
+  if not (options.membership_csv or options.membership_filename):
+    log_and_exit(
+      '--membership_csv or --membership_filename needs to be specified')
+
   if not options.set_membership_arrays_filename:
     log_and_exit('--set_membership_arrays_filename must be specified')
   elif os.path.exists(options.set_membership_arrays_filename):
@@ -41,11 +48,33 @@ def parseargs():
       options.set_membership_arrays_filename)
   return options
 
+def membership_csv_to_bin(csv_filename, binary_filename):
+  assert csv_filename and os.path.exists(csv_filename)
+  assert binary_filename
+  log.info('CSV membership filesize: %s bytes' % os.path.getsize(csv_filename))
+  group_members = collections.defaultdict(int)
+  with open(csv_filename) as csvfile:
+    for i, line in enumerate(csvfile):
+      user_id, group_id = map(int, line.strip().split(','))
+      group_members[group_id] += 1
+      if i % 1000000 == 0: log.info("Progress: %d" % i)
+
+  f = lambda id: group_members[id] <= options.small_group_threshold
+  group_id_blacklist = set(id for id in group_members if f(id))
+
+  with open(csv_filename) as csvfile:
+    with open(binary_filename, 'wb+') as binaryfile:
+      for i, line in enumerate(csvfile):
+        user_id, group_id = map(int, line.strip().split(','))
+        if group_id not in group_id_blacklist:
+          binaryfile.write(struct.pack('II', user_id, group_id))
+        if i % 1000000 == 0: log.info("Write progress: %d" % i)
+
 def load_membership_file(filename):
   try:
     fh = open(filename, 'r')
     filesize = os.path.getsize(filename)
-    log.info('CSV membership input file size: %s bytes' % filesize)
+    log.info('Binary membership input file size: %s bytes' % filesize)
     return fh, filesize
   except (IOError, TypeError):
     log_and_exit(
@@ -156,7 +185,14 @@ SEGSIZE = 10000
 
 if __name__ == '__main__':
   options = parseargs()
-  membership_fh, membership_filesize = load_membership_file(options.membership_filename)
+
+  exists = lambda path: path is not None and os.path.exists(path)
+  if exists(options.membership_csv) and not exists(options.membership_filename):
+    log.debug('Need to convert input CSV to binary image')
+    membership_csv_to_bin(options.membership_csv, options.membership_filename)
+
+  membership_tuple = load_membership_file(options.membership_filename)
+  membership_fh, membership_filesize = membership_tuple
 
   set_ids = load_or_enumerate_set_ids()
   set_array_offsets = dict()
