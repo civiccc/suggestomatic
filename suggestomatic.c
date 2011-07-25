@@ -8,15 +8,6 @@
 #include <sys/mman.h>
 #include <time.h>
 
-#define PACKAGE "mmap"
-
-/***
- * Samples only set_a, because it's large arrays for set_a that slow down the
- * process. 
- */
-
-//TODO this would be better as a continuous function so that each set_a iteration
-// takes as close to the same amount of time as possible
 inline unsigned int
 set_intersection(
     unsigned int* set_a,
