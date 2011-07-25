@@ -9,6 +9,7 @@ import logging
 import os.path
 import struct
 import sys
+import time
 
 
 logging.basicConfig()
@@ -23,18 +24,24 @@ def parseargs():
   parser = argparse.ArgumentParser(
     description="Prepare Suggestomatic data files from set membership CSV dump")
 
-  args = (
-    ('membership-csv', '(i) set membership CSV of form (user_id, set_id)'),
-    ('membership-filename', '(i) set membership binary image filename'),
-    ('set-membership-arrays-filename', '(o) Array of member_id arrays filename'),
-    ('member-index-filename', '(o) Index array into member array filename'),
-    ('set-id-filename', '(i/o) Array of set_ids filename')
-  )
-  for switch, help in args:
-    parser.add_argument('--%s' % switch, type=str, help=help)
-  parser.add_argument('--small-group-threshold', type=int, default=1,
+  timestamp = time.time()
+  addarg = parser.add_argument
+  addarg('--membership-csv', type=str,
+    help='(i) set membership CSV of form (user_id, set_id')
+  addarg('--membership-filename', type=str,
+    default='%s-membership.bin' % time.time(),
+    help='(i) set membership binary image filename')
+  addarg('--set-membership-arrays-filename', type=str,
+    default='%s-set-members.bin' % time.time(),
+    help='(o) Array of member_id ararys filename')
+  addarg('--set-members-index-filename', type=str,
+    default='%s-set-members-index.bin' % time.time(),
+    help='(o) Index array into set members arrays filename')
+  addarg('--set-id-filename', type=str,
+    default='%s-set-ids.bin' % time.time(),
+    help='(i/o) Array of set_ids filename')
+  addarg('--small-group-threshold', type=int, default=1,
     help="Drop groups with less than or equal to this many members")
-
 
   options = parser.parse_args()
   if not (options.membership_csv or options.membership_filename):
@@ -231,6 +238,14 @@ if __name__ == '__main__':
     log.info("Skipped %d sets with 1 member" % small_sets)
 
   verify_results(options.set_membership_arrays_filename, set_array_offsets)
-  generate_index(options.member_index_filename, set_array_offsets)
+  generate_index(options.set_members_index_filename, set_array_offsets)
+  log.info('Finished preparing data for Suggestomatic. To start, run:')
+  log.info(' '.join((
+    './suggestomatic',
+    options.set_id_filename,
+    options.set_members_index_filename,
+    options.set_membership_arrays_filename,
+    'suggestions.csv'
+  )))
 
 
