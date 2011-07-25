@@ -9,9 +9,7 @@
 #include <time.h>
 
 #define PACKAGE "mmap"
-#define STOP 0
 
-unsigned int set_intersection(unsigned int* set_a, unsigned int set_a_size, unsigned int* set_b, unsigned int set_b_size);
 /***
  * Samples only set_a, because it's large arrays for set_a that slow down the
  * process. 
@@ -19,16 +17,12 @@ unsigned int set_intersection(unsigned int* set_a, unsigned int set_a_size, unsi
 
 //TODO this would be better as a continuous function so that each set_a iteration
 // takes as close to the same amount of time as possible
-unsigned short
-get_step(unsigned int set_size) {
-  if      (set_size < 100000)  { return 1; }
-  else if (set_size < 1000000) { return 100; }
-  else                         { return 1000; }
-}
-
 inline unsigned int
-set_intersection(unsigned int* set_a, unsigned int set_a_size, unsigned int*
-set_b, unsigned int set_b_size) {
+set_intersection(
+    unsigned int* set_a,
+    unsigned int set_a_size,
+    unsigned int* set_b,
+    unsigned int set_b_size) {
   unsigned int a, b;
   unsigned int *set_a_stop = set_a + set_a_size,
                *set_b_stop = set_b + set_b_size;
@@ -75,7 +69,7 @@ load_binary_file(char *filename) {
   struct fileinfo fi;
 
   if ((fi.fh = open(filename, O_RDONLY)) == -1) {
-    fprintf(stderr, "%s: Error: opening file: %s\n", PACKAGE, filename), exit(EXIT_FAILURE);
+    fprintf(stderr, "mmap: Error: opening file: %s\n", filename), exit(EXIT_FAILURE);
   }
 
   fi.filesize = lseek(fi.fh, 0, SEEK_END);
@@ -137,13 +131,18 @@ int
 main(int argc, char *argv[]) {
   test_set_intersection();
   printf("Smoke tests pass, starting engine\n");
+
+  // set up command line params
   char *set_ids_filename = argv[1],
        *set_index_filename = argv[2],
        *set_members_filename = argv[3],
        *suggestions_filename = argv[4];
+  unsigned int good_threshold = atoi(argv[5]);
+
+  // optional param with default
   unsigned int begin_at = 0;
-  if (argc > 5) {
-    begin_at = atoi(argv[5]);
+  if (argc > 6) {
+    begin_at = atoi(argv[6]);
   }
   printf("Beginning at set id %d", begin_at);
 
@@ -191,12 +190,12 @@ main(int argc, char *argv[]) {
     // the last elements
     unsigned int random_id_offset = rand() % set_id_count;
     unsigned int set_b_index;
-    printf("Set `%d` length: %d (sample size: %d) random offset: %d \n", set_id_a, (int)(set_a_length), get_step(set_a_length), random_id_offset);
+    printf("Set `%d` \t length: %d \t random offset: %d \n", set_id_a, (int)(set_a_length), random_id_offset);
     for (int b = a + 1; b < set_id_count; b++) {
       // wrap around back to the start if the offset is too large
-      set_b_index = (random_id_offset + b) % set_id_count;
+      set_b_index = b;
       set_id_b = set_ids[set_b_index];
-      set_b_length = indexptr[set_b_index+1] - indexptr[set_id_b];
+      set_b_length = indexptr[set_ids[set_b_index+1]] - indexptr[set_id_b];
 
       // offsets are in bytes but pointer arithmetic calls for words
       intersection_count = set_intersection(
@@ -207,8 +206,7 @@ main(int argc, char *argv[]) {
       );
 
       // record "good" matches
-      //TODO this threshold should depend on the size of set_a
-      if (intersection_count > 100) {
+      if (intersection_count > good_threshold) {
         write_result(fout, set_id_a, set_id_b, intersection_count);
         ++goodmatches;
         // early out when we have "enough" good matches
