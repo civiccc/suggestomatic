@@ -15,5 +15,5 @@ How to use
 
 3. Run Suggestomatic:
    `make suggestomatic`
-   <command line invocation from #2>
-   
+   `(command line invocation from #2>)`
+   (it will look something like `./suggestomatic 1311574636.32-set-ids.bin 1311574636.32-set-members-index.bin 1311574636.32-set-members.bin 0 suggestions.csv`)

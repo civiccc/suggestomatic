@@ -245,6 +245,7 @@ if __name__ == '__main__':
     options.set_id_filename,
     options.set_members_index_filename,
     options.set_membership_arrays_filename,
+    '0',
     'suggestions.csv'
   )))
 
