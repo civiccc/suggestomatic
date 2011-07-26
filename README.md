@@ -17,3 +17,15 @@ How to use
    `make suggestomatic`
    `(command line invocation from #2>)`
    (it will look something like `./suggestomatic 1311574636.32-set-ids.bin 1311574636.32-set-members-index.bin 1311574636.32-set-members.bin 0 suggestions.csv`)
+
+How to generate test data
+--------
+
+    derwiki@fordfiesta:~/src/suggestomatic/test$ nice ./test.py --only-csv --recommendation-file=test_data --num-groups=1000
+    Invalid option --recommendation-file=test_data. Try ./test --help for help.
+    derwiki@fordfiesta:~/src/suggestomatic/test$ ls -lh
+    total 1.7M
+    -rw-r--r-- 1 derwiki derwiki 1.7M 2011-07-25 22:24 test_data
+    -rwxr-xr-x 1 derwiki derwiki 5.0K 2011-07-25 22:17 test.py
+
+
