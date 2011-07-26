@@ -28,4 +28,13 @@ How to generate test data
     -rw-r--r-- 1 derwiki derwiki 1.7M 2011-07-25 22:24 test_data
     -rwxr-xr-x 1 derwiki derwiki 5.0K 2011-07-25 22:17 test.py
 
+How to analyze the performance of `suggestomatic` with valgrind
+--------
+
+    valgrind --tool=callgrind ./suggestomatic <args>
+    callgrind_annotate --auto=yes callgrind.out.<pid>
+
+valgrind will spit out a copy of your source code along with how many
+instructions were spent on each line.
+
 
