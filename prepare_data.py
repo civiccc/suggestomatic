@@ -178,7 +178,7 @@ def generate_index(index_filename, set_array_offsets):
     index_list = [
       set_array_offsets.get(set_id, 0)
       for set_id
-      in xrange(max(set_array_offsets.keys()))
+      in xrange(max(set_array_offsets.keys()) + 1) # xrange is xclusive, add 1
     ]
     index_array = array.array('I')
     index_array.fromlist(index_list)

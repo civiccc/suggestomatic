@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -28,6 +29,8 @@ set_intersection(
       ++intersections;
       ++set_a;
       ++set_b;
+    } else if (0 == a || 0 == b) {
+      return intersections;
     } else {
       ++set_a;
     }
@@ -37,9 +40,9 @@ set_intersection(
 
 int
 test_set_intersection() {
-  unsigned int set_a[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0};
+  unsigned int set_a[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   unsigned int set_a_size = sizeof(set_a) / sizeof(set_a[0]);
-  unsigned int set_b[] = {5, 6, 7, 8, 9, 10, 11, 12, 0};
+  unsigned int set_b[] = {5, 6, 7, 8, 9, 10, 11, 12};
   unsigned int set_b_size = sizeof(set_b) / sizeof(set_b[0]);
   unsigned int members_in_common = set_intersection(set_a, set_a_size, set_b, set_b_size);
   if (members_in_common != 6) {
@@ -149,7 +152,7 @@ main(int argc, char *argv[]) {
   //  acts as a set_id -> memory offset lookup table
   //  eg, indexarray[set_id] == arrays + offset_of_set_id_in_image
   struct fileinfo indexarray = load_binary_file(set_index_filename);
-  const unsigned int *indexptr = (unsigned int*) indexarray.head;
+  unsigned int *indexptr = (unsigned int*) indexarray.head;
 
   // visual inspection sanity check
   first_10_elements((unsigned int*)indexarray.head, set_index_filename);
@@ -165,11 +168,21 @@ main(int argc, char *argv[]) {
   unsigned long counter = 0, intersection_count;
   int started_at = (int)time(NULL);
   unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
+  unsigned int* end_offset;
 
   printf("%9s %9s %20s %20s %20s \n", "id a", "id b", "comparisons", "good matches", "time elapsed (s)");
   for (int a = begin_at; a < set_id_count; a++) {
     set_id_a = set_ids[a];
-    set_a_length = indexptr[set_ids[a+1]] - indexptr[set_id_a];
+    if (a + 1 == set_id_count) {
+      end_offset = indexptr + arrays.filesize;
+      printf("*using special offset*");
+    } else {
+      end_offset = indexptr[set_ids[a+1]];
+    }
+    if (set_id_a > 1996)
+      printf("\n %p \t %p \t %u \n", end_offset, indexptr[set_id_a], (unsigned int)((void *)end_offset - (void*)indexptr[set_id_a]));
+    // be super careful to subtract addresses and not sizeof(int) quantities
+    set_a_length = (unsigned int)((void*)end_offset - (void*)indexptr[set_id_a]);
    
     if (set_a_length == 0) { continue; }
 
@@ -181,7 +194,7 @@ main(int argc, char *argv[]) {
     // the last elements
     unsigned int random_id_offset = rand() % set_id_count;
     unsigned int set_b_index;
-    printf("Set `%d` \t length: %d \t random offset: %d \n", set_id_a, (int)(set_a_length), random_id_offset);
+    printf("Set `%d` \t length: %u \t random offset: %d \n", set_id_a, (int)(set_a_length), random_id_offset);
     for (int b = a + 1; b < set_id_count; b++) {
       // wrap around back to the start if the offset is too large
       set_b_index = b;
