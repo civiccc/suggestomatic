@@ -9,14 +9,16 @@ How to use
    `mysql -e 'select concat(user_id, \",\", group_id) as r from memberships)'`
 
 2. Data preparation:
-   `python ./prepare.py_data --membership-csv=<file you dumped in #1>`
+
+    python ./prepare.py_data --membership-csv=(file you dumped in #1)
+
    When this step is done, it will print the command line arguments needed
    to load that data file into Suggestomatic
 
 3. Run Suggestomatic:
-   `make suggestomatic`
-   `(command line invocation from #2>)`
-   (it will look something like `./suggestomatic 1311574636.32-set-ids.bin 1311574636.32-set-members-index.bin 1311574636.32-set-members.bin 0 suggestions.csv`)
+
+    make suggestomatic ;
+    ./suggestomatic 1311574636.32-set-ids.bin 1311574636.32-set-members-index.bin 1311574636.32-set-members.bin suggestions.csv 100
 
 How to generate test data
 --------
