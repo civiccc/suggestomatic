@@ -9,15 +9,13 @@
 #include <sys/mman.h>
 #include <time.h>
 
-inline unsigned int
+unsigned int
 set_intersection(
     const unsigned int* set_a,
-    unsigned int set_a_size,
+    const unsigned int* set_a_stop,
     const unsigned int* set_b,
-    unsigned int set_b_size) {
+    const unsigned int* set_b_stop) {
   unsigned int a, b;
-  const unsigned int *set_a_stop = set_a + set_a_size,
-                     *set_b_stop = set_b + set_b_size;
   unsigned int intersections = 0;
   while (set_a < set_a_stop && set_b < set_b_stop) {
     // caching these derefences makes it much faster
@@ -41,10 +39,10 @@ set_intersection(
 int
 test_set_intersection() {
   unsigned int set_a[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  unsigned int set_a_size = sizeof(set_a) / sizeof(set_a[0]);
+  unsigned int *set_a_end = set_a + sizeof(set_a) / sizeof(set_a[0]);
   unsigned int set_b[] = {5, 6, 7, 8, 9, 10, 11, 12};
-  unsigned int set_b_size = sizeof(set_b) / sizeof(set_b[0]);
-  unsigned int members_in_common = set_intersection(set_a, set_a_size, set_b, set_b_size);
+  unsigned int *set_b_end = set_b + sizeof(set_b) / sizeof(set_b[0]);
+  unsigned int members_in_common = set_intersection(set_a, set_a_end, set_b, set_b_end);
   if (members_in_common != 6) {
     printf("Got %i instead of 6\n", members_in_common);
     return -1;
@@ -123,7 +121,9 @@ first_10_elements(unsigned int *head, char *filename) {
 
 int
 main(int argc, char *argv[]) {
-  test_set_intersection();
+  if (test_set_intersection() != 0) {
+    return EXIT_FAILURE;
+  }
   printf("Smoke tests pass, starting engine\n");
 
   // set up command line params
@@ -167,46 +167,39 @@ main(int argc, char *argv[]) {
   FILE *fout = fopen(suggestions_filename, "a+");
   unsigned long counter = 0, intersection_count;
   int started_at = (int)time(NULL);
-  unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
-  unsigned int* end_offset;
+  unsigned int set_id_a, set_id_b, set_a_length;
+  unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
 
   printf("%9s %9s %20s %20s %20s \n", "id a", "id b", "comparisons", "good matches", "time elapsed (s)");
   for (int a = begin_at; a < set_id_count; a++) {
     set_id_a = set_ids[a];
-    if (a + 1 == set_id_count) {
-      end_offset = indexptr + arrays.filesize;
-      printf("*using special offset*");
-    } else {
-      end_offset = indexptr[set_ids[a+1]];
-    }
-    if (set_id_a > 1996)
-      printf("\n %p \t %p \t %u \n", end_offset, indexptr[set_id_a], (unsigned int)((void *)end_offset - (void*)indexptr[set_id_a]));
+
     // be super careful to subtract addresses and not sizeof(int) quantities
-    set_a_length = (unsigned int)((void*)end_offset - (void*)indexptr[set_id_a]);
+    set_a_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_a]);
+    if (a + 1 == set_id_count) {
+      set_a_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
+    } else {
+	  set_a_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[a+1]]);
+    }
+    set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
    
-    if (set_a_length == 0) { continue; }
+    if (set_a_start == set_a_end) { continue ; }
 
     // goodmatches is a basic heuristic for preventing any set_a's iteration
     // from taking too long. Once sampling is effective, this can be removed
     unsigned short int goodmatches = 0;
-    // starting randomly in tihe set id list will make sure we don't always
-    // compare the first elements of the array and possibly never even get to
-    // the last elements
-    unsigned int random_id_offset = rand() % set_id_count;
-    unsigned int set_b_index;
-    printf("Set `%d` \t length: %u \t random offset: %d \n", set_id_a, (int)(set_a_length), random_id_offset);
+    printf("Set a: %d \t length: %u \t", set_id_a, set_a_length);
     for (int b = a + 1; b < set_id_count; b++) {
-      // wrap around back to the start if the offset is too large
-      set_b_index = b;
-      set_id_b = set_ids[set_b_index];
-      set_b_length = indexptr[set_ids[set_b_index+1]] - indexptr[set_id_b];
+      set_id_b = set_ids[a];
+      set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
+      if (a + 1 == set_id_count) {
+        set_b_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
+      } else {
+        set_b_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[b+1]]);
+      }
 
-      // offsets are in bytes but pointer arithmetic calls for words
       intersection_count = set_intersection(
-        arraysptr + indexptr[set_id_a] / sizeof(unsigned int),
-        set_a_length,
-        arraysptr + indexptr[set_id_b] / sizeof(unsigned int),
-        set_b_length
+        set_a_start, set_a_end, set_b_start, set_b_end
       );
 
       // record "good" matches
@@ -223,7 +216,7 @@ main(int argc, char *argv[]) {
         print_progress(set_id_a, set_id_b, counter, goodmatches, started_at);
       }
     }
-    printf("`%d` hit %d matches -- ", set_id_a, goodmatches);
+    printf("%d good matches \n", goodmatches);
   }
   printf("\nSuggestomatic success!\n");
   return EXIT_SUCCESS;
