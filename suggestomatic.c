@@ -82,34 +82,6 @@ void write_result(
 }
 
 void
-print_progress_headers() {
-  printf(
-    "%9s %9s %20s %20s %20s \n",
-    "id a", "id b",
-    "comparisons",
-    "good matches",
-    "time elapsed (s)"
-  );
-}
-
-void
-print_progress(
-    unsigned int set_id_a,
-    unsigned int set_id_b,
-    unsigned long counter,
-    unsigned short int goodmatches,
-    int started_at) {
-  printf(
-  "%9d %9d %20lu %20d %20d\n", 
-    set_id_a,
-    set_id_b,
-    counter,
-    goodmatches,
-    (int)time(NULL) - started_at
-  );
-}
-
-void
 first_10_elements(unsigned int *head, char *filename) {
   printf("Printing first 10 elements of %s\n", filename);
   unsigned int *limit = head + 10;
@@ -117,6 +89,13 @@ first_10_elements(unsigned int *head, char *filename) {
     printf("0x%p: %u\n", head, *head);
   }
   printf("\n");
+}
+
+void print_progress_headers() {
+  printf(
+    "%9s %9s %20s %20s \n",
+    "id a", "length", "good matches", "time elapsed (s)"
+  );
 }
 
 int
@@ -165,12 +144,12 @@ main(int argc, char *argv[]) {
   first_10_elements((unsigned int*)arrays.head, set_members_filename);
 
   FILE *fout = fopen(suggestions_filename, "a+");
-  unsigned long counter = 0, intersection_count;
+  unsigned long intersection_count;
   int started_at = (int)time(NULL);
   unsigned int set_id_a, set_id_b, set_a_length;
   unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
 
-  printf("%9s %9s %20s %20s %20s \n", "id a", "id b", "comparisons", "good matches", "time elapsed (s)");
+  print_progress_headers();
   for (int a = begin_at; a < set_id_count; a++) {
     set_id_a = set_ids[a];
 
@@ -188,7 +167,7 @@ main(int argc, char *argv[]) {
     // goodmatches is a basic heuristic for preventing any set_a's iteration
     // from taking too long. Once sampling is effective, this can be removed
     unsigned short int goodmatches = 0;
-    printf("Set a: %d \t length: %u \t", set_id_a, set_a_length);
+    printf("%9u %9u", set_id_a, set_a_length);
     for (int b = a + 1; b < set_id_count; b++) {
       set_id_b = set_ids[b];
       set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
@@ -210,13 +189,9 @@ main(int argc, char *argv[]) {
         if (goodmatches >= 100) { break; }
       }
 
-      // visual output for progress
-      if (++counter % 100000 == 0) {
-        if (counter % 1000000 == 0) { print_progress_headers(); }
-        print_progress(set_id_a, set_id_b, counter, goodmatches, started_at);
-      }
     }
-    printf("%d good matches \n", goodmatches);
+    printf("%20d %20d \n", goodmatches, (int)time(NULL) - started_at);
+    if (0 == set_id_a % 10) { print_progress_headers(); }
   }
   printf("\nSuggestomatic success!\n");
   return EXIT_SUCCESS;
