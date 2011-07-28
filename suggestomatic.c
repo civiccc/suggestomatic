@@ -190,7 +190,7 @@ main(int argc, char *argv[]) {
     unsigned short int goodmatches = 0;
     printf("Set a: %d \t length: %u \t", set_id_a, set_a_length);
     for (int b = a + 1; b < set_id_count; b++) {
-      set_id_b = set_ids[a];
+      set_id_b = set_ids[b];
       set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
       if (a + 1 == set_id_count) {
         set_b_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
