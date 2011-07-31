@@ -77,8 +77,15 @@ void write_result(
     FILE *fout,
     unsigned int set_id_a,
     unsigned int set_id_b,
-    unsigned int intersection) {
-  fprintf(fout, "%d,%d,%d\n", set_id_a, set_id_b, intersection);
+    unsigned int intersection,
+    unsigned int set_a_length,
+    unsigned int set_b_length) {
+  fprintf(fout,
+    "%d,%d,%d,%d,%d\n",
+    set_id_a, set_id_b,
+    intersection,
+    set_a_length, set_b_length
+  );
 }
 
 void
@@ -146,7 +153,7 @@ main(int argc, char *argv[]) {
   FILE *fout = fopen(suggestions_filename, "a+");
   unsigned long intersection_count;
   int started_at = (int)time(NULL);
-  unsigned int set_id_a, set_id_b, set_a_length;
+  unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
   unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
 
   print_progress_headers();
@@ -176,6 +183,7 @@ main(int argc, char *argv[]) {
       } else {
         set_b_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[b+1]]);
       }
+      set_b_length = (unsigned int)((char*)set_b_end - (char*)set_b_start);
 
       intersection_count = set_intersection(
         set_a_start, set_a_end, set_b_start, set_b_end
@@ -183,7 +191,8 @@ main(int argc, char *argv[]) {
 
       // record "good" matches
       if (intersection_count > good_threshold) {
-        write_result(fout, set_id_a, set_id_b, intersection_count);
+        write_result(fout,
+          set_id_a, set_id_b, intersection_count, set_a_length, set_b_length);
         ++goodmatches;
         // early out when we have "enough" good matches
         if (goodmatches >= 100) { break; }
