@@ -77,8 +77,8 @@ void write_result(
     FILE *fout,
     unsigned int set_id_a,
     unsigned int set_id_b,
-    unsigned int intersection) {
-  fprintf(fout, "%d,%d,%d\n", set_id_a, set_id_b, intersection);
+    double intersection_percent) {
+  fprintf(fout, "%d,%d,%f\n", set_id_a, set_id_b, intersection_percent);
 }
 
 void
@@ -110,7 +110,7 @@ main(int argc, char *argv[]) {
        *set_index_filename = argv[2],
        *set_members_filename = argv[3],
        *suggestions_filename = argv[4];
-  unsigned int good_threshold = atoi(argv[5]);
+  double good_threshold = atof(argv[5]);
 
   // optional param with default
   unsigned int begin_at = 0;
@@ -143,9 +143,10 @@ main(int argc, char *argv[]) {
   // visual inspection sanity check
   first_10_elements((unsigned int*)arrays.head, set_members_filename);
 
-  FILE *fout = fopen(suggestions_filename, "a+");
+  FILE *fout = fopen(suggestions_filename, "w");
   unsigned long intersection_count;
   int started_at = (int)time(NULL);
+  clock_t start = clock();
   unsigned int set_id_a, set_id_b, set_a_length;
   unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
 
@@ -168,7 +169,10 @@ main(int argc, char *argv[]) {
     // from taking too long. Once sampling is effective, this can be removed
     unsigned short int goodmatches = 0;
     printf("%9u %9u", set_id_a, set_a_length);
-    for (int b = a + 1; b < set_id_count; b++) {
+    for (int b = begin_at; b < set_id_count; b++) {
+      // We don't compare sets to themselves.
+      if (a == b) { continue; }
+
       set_id_b = set_ids[b];
       set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
       if (a + 1 == set_id_count) {
@@ -181,9 +185,12 @@ main(int argc, char *argv[]) {
         set_a_start, set_a_end, set_b_start, set_b_end
       );
 
+      // Calculate the percentage of set_a that intersects with set_b.
+      double intersection_percent = ((double) intersection_count)/set_a_length;
+
       // record "good" matches
-      if (intersection_count > good_threshold) {
-        write_result(fout, set_id_a, set_id_b, intersection_count);
+      if (intersection_percent >= good_threshold) {
+        write_result(fout, set_id_a, set_id_b, intersection_percent);
         ++goodmatches;
         // early out when we have "enough" good matches
         if (goodmatches >= 100) { break; }
@@ -193,7 +200,11 @@ main(int argc, char *argv[]) {
     printf("%20d %20d \n", goodmatches, (int)time(NULL) - started_at);
     if (0 == set_id_a % 10) { print_progress_headers(); }
   }
+  fclose(fout);
   printf("\nSuggestomatic success!\n");
+  clock_t end = clock();
+  double elapsed = (((double) (end - start)) / CLOCKS_PER_SEC) * 1000;
+  printf("CPU-time in ms: %f\n", elapsed);
   return EXIT_SUCCESS;
 }
 
