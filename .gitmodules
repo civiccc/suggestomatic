@@ -1,0 +1,3 @@
+[submodule "vendor/bloom"]
+	path = vendor/bloom
+	url = git://github.com/davepederson/bloom.git

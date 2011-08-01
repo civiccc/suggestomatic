@@ -9,6 +9,8 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include "vendor/bloom/bloom.h"
+#include "vendor/bloom/bloom.c"
 
 unsigned int
 set_intersection(
@@ -50,6 +52,11 @@ test_set_intersection() {
   }
   return 0;
 }
+
+struct null_integer {
+  unsigned int id;
+  char zero;
+};
 
 struct fileinfo {
   int fh;
@@ -181,7 +188,22 @@ main(int argc, char *argv[]) {
 
     // by no means a permanent fix, this means we can at get some
     // recommendations for the smaller sets
-    if (set_a_length > 100000) { continue ; }
+    if (set_a_length > 100000) {
+      printf("Preparing bloom filter... ");
+      fflush(0);
+      bloom_t *set_a_bloom = bloom_filter_new(2500000);
+      unsigned int *set_a_iter = set_a_start;
+      while (set_a_iter < set_a_end) {
+        struct null_integer item;
+        item.id = *set_a_iter++;
+        if (item.id == 0) { continue; }
+        printf("%u\n", item.id);
+        item.zero = 0x0;
+        bloom_filter_add(set_a_bloom, (char*)&item);
+      }
+      printf("Done.\n");
+      }
+    }
 
     if (set_a_start == set_a_end) { continue ; }
 
