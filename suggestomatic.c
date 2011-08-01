@@ -159,7 +159,7 @@ main(int argc, char *argv[]) {
   unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
   unsigned int *result_set = (unsigned int*)malloc(set_id_count * 2 * sizeof(int));
   if (result_set == NULL) {
-    perror("Out of memory.\n");
+    perror(NULL);
     exit(EXIT_FAILURE);
   }
 
