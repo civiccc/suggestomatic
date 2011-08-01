@@ -193,9 +193,11 @@ main(int argc, char *argv[]) {
     // recommendations for the smaller sets
     bloom_t *set_a_bloom = NULL;
     if (set_a_length > 40000) {
-      printf("Preparing bloom filter... ");
-      fflush(0);
-      bloom_t *set_a_bloom = bloom_filter_new(2500000);
+      set_a_bloom = bloom_filter_new(2500000);
+      if (NULL == set_a_bloom) {
+        perror(NULL);
+        return EXIT_FAILURE;
+      }
       unsigned int *set_a_iter = set_a_start;
       unsigned int i = 0;
       while (set_a_iter < set_a_end) {
@@ -204,12 +206,12 @@ main(int argc, char *argv[]) {
         bloom_filter_add(set_a_bloom, bloom_key);
         i += bloom_filter_contains(set_a_bloom, bloom_key);
       }
-      printf("Done: %d elements.\n", i);
     }
 
     if (set_a_start == set_a_end) { continue ; }
 
     printf("%9u %9u %9u", a, set_id_a, set_a_length);
+    if (NULL != set_a_bloom) { printf("*"); }
     fflush(0);
     for (int b = a + 1; b < set_id_count; b++) {
       set_id_b = set_ids[b];
@@ -221,13 +223,12 @@ main(int argc, char *argv[]) {
       }
       set_b_length = (unsigned int)((char*)set_b_end - (char*)set_b_start);
 
-      if (set_a_length > 40000) {
+      if (set_a_bloom != NULL) {
         score = 0;
         for (unsigned int *set_b_ele = set_b_start; set_b_ele < set_b_end; set_b_ele++) {
           bloom_item.id = *set_b_ele;
           score += bloom_filter_contains(set_a_bloom, bloom_key);
         }
-        if (score > 0) { printf("%d\n", score); }
       } else {
         score = set_intersection(
           set_a_start, set_a_end, set_b_start, set_b_end
@@ -251,7 +252,7 @@ main(int argc, char *argv[]) {
     }
 
     printf(
-      " * %20lu %20d \n",
+      " %20lu %20d \n",
       bytes_used / sizeof(unsigned int),
       (int)time(NULL) - started_at
     );
