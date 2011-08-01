@@ -94,8 +94,8 @@ first_10_elements(unsigned int *head, char *filename) {
 
 void print_progress_headers() {
   printf(
-    "%9s %9s %20s %20s \n",
-    "id a", "length", "non-0 matches", "time elapsed (s)"
+    "%9s %9s %9s %20s %20s \n",
+    "id a", "set_id_a", "length", "non-0 matches", "time elapsed (s)"
   );
 }
 
@@ -157,13 +157,14 @@ main(int argc, char *argv[]) {
   int started_at = (int)time(NULL);
   unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
   unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
+  unsigned int* result_set = (unsigned int*)malloc(set_id_count * 2 * sizeof(int));
 
   print_progress_headers();
   for (int a = begin_at; a < set_id_count; a++) {
     // 2 => (set_id_b, score)
-    unsigned int* result_set = (unsigned int*)malloc(set_id_count * 2 * sizeof(int));
     unsigned int* rs_iter = result_set;
     set_id_a = set_ids[a];
+    memset(result_set, (char)0x0, set_id_count * 2 * sizeof(int));
 
     // be super careful to subtract addresses and not sizeof(int) quantities
     set_a_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_a]);
@@ -180,7 +181,7 @@ main(int argc, char *argv[]) {
 
     if (set_a_start == set_a_end) { continue ; }
 
-    printf("%9u %9u", set_id_a, set_a_length);
+    printf("%9u %9u %9u", a, set_id_a, set_a_length);
     fflush(0);
     for (int b = a + 1; b < set_id_count; b++) {
       set_id_b = set_ids[b];
@@ -219,6 +220,7 @@ main(int argc, char *argv[]) {
     );
     if (0 == set_id_a % 10) { print_progress_headers(); }
   }
+  free(result_set);
   printf("\nSuggestomatic success!\n");
   return EXIT_SUCCESS;
 }
