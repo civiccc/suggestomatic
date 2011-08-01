@@ -98,6 +98,12 @@ void print_progress_headers() {
   );
 }
 
+unsigned int*
+add_ptrs(unsigned int* ptr_a, unsigned int* ptr_b, char operation) {
+  int sign = operation == '+' ? 1 : (-1);
+  return (unsigned int*)((char*)ptr_a + (char*)((sign) * ptr_b));
+}
+
 int
 main(int argc, char *argv[]) {
   if (test_set_intersection() != 0) {
@@ -154,13 +160,13 @@ main(int argc, char *argv[]) {
     set_id_a = set_ids[a];
 
     // be super careful to subtract addresses and not sizeof(int) quantities
-    set_a_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_a]);
+    set_a_start = add_ptrs(arraysptr, indexptr[set_id_a], '+');
     if (a + 1 == set_id_count) {
-      set_a_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
+      set_a_end = add_ptrs(arraysptr, arrays.filesize, '+');
     } else {
-	  set_a_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[a+1]]);
+      set_a_end = add_ptrs(arraysptr, indexptr[set_ids[a+1]], '+');
     }
-    set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
+    set_a_length = add_ptrs(set_a_end, set_a_start, '-');
    
     if (set_a_start == set_a_end) { continue ; }
 
