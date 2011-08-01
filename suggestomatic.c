@@ -173,6 +173,7 @@ main(int argc, char *argv[]) {
   print_progress_headers();
   struct null_integer bloom_item;
   bloom_item.zero = 0x0;
+  char *bloom_key = (char*)&bloom_item;
   for (int a = begin_at; a < set_id_count; a++) {
     // 2 => (set_id_b, score)
     unsigned int* rs_iter = result_set;
@@ -200,8 +201,8 @@ main(int argc, char *argv[]) {
       while (set_a_iter < set_a_end) {
         bloom_item.id = *set_a_iter++;
         if (bloom_item.id == 0) { continue; }
-        bloom_filter_add(set_a_bloom, (char*)&bloom_item);
-        i += bloom_filter_contains(set_a_bloom, (char*)&bloom_item);
+        bloom_filter_add(set_a_bloom, bloom_key);
+        i += bloom_filter_contains(set_a_bloom, bloom_key);
       }
       printf("Done: %d elements.\n", i);
     }
@@ -224,7 +225,7 @@ main(int argc, char *argv[]) {
         score = 0;
         for (unsigned int *set_b_ele = set_b_start; set_b_ele < set_b_end; set_b_ele++) {
           bloom_item.id = *set_b_ele;
-          score += bloom_filter_contains(set_a_bloom, (char*)&bloom_item);
+          score += bloom_filter_contains(set_a_bloom, bloom_key);
         }
         if (score > 0) { printf("%d\n", score); }
       } else {
