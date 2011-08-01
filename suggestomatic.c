@@ -1,13 +1,14 @@
 #include <assert.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <unistd.h>
 #include <fcntl.h>
 #include <math.h>
-#include <sys/types.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 unsigned int
 set_intersection(
@@ -77,15 +78,8 @@ void write_result(
     FILE *fout,
     unsigned int set_id_a,
     unsigned int set_id_b,
-    unsigned int intersection,
-    unsigned int set_a_length,
-    unsigned int set_b_length) {
-  fprintf(fout,
-    "%d,%d,%d,%d,%d\n",
-    set_id_a, set_id_b,
-    intersection,
-    set_a_length, set_b_length
-  );
+    unsigned int score) {
+  fprintf(fout, "%d,%d,%d,\n", set_id_a, set_id_b, score);
 }
 
 void
@@ -101,8 +95,17 @@ first_10_elements(unsigned int *head, char *filename) {
 void print_progress_headers() {
   printf(
     "%9s %9s %20s %20s \n",
-    "id a", "length", "good matches", "time elapsed (s)"
+    "id a", "length", "non-0 matches", "time elapsed (s)"
   );
+}
+
+// qsort int comparison function
+int int_cmp(const void *a, const void *b)
+{
+  // input are in (id, score) format, so grab the second word only
+  const int *ia = ((const int *)a)+1;
+  const int *ib = ((const int *)b)+1;
+  return *ib  - *ia;
 }
 
 int
@@ -117,12 +120,11 @@ main(int argc, char *argv[]) {
        *set_index_filename = argv[2],
        *set_members_filename = argv[3],
        *suggestions_filename = argv[4];
-  unsigned int good_threshold = atoi(argv[5]);
 
   // optional param with default
   unsigned int begin_at = 0;
-  if (argc > 6) {
-    begin_at = atoi(argv[6]);
+  if (argc > 5) {
+    begin_at = atoi(argv[5]);
   }
   printf("Beginning at set id %d", begin_at);
 
@@ -151,13 +153,16 @@ main(int argc, char *argv[]) {
   first_10_elements((unsigned int*)arrays.head, set_members_filename);
 
   FILE *fout = fopen(suggestions_filename, "a+");
-  unsigned long intersection_count;
+  unsigned long score;
   int started_at = (int)time(NULL);
   unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
   unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
 
   print_progress_headers();
   for (int a = begin_at; a < set_id_count; a++) {
+    // 2 => (set_id_b, score)
+    unsigned int* result_set = (unsigned int*)malloc(set_id_count * 2 * sizeof(int));
+    unsigned int* rs_iter = result_set;
     set_id_a = set_ids[a];
 
     // be super careful to subtract addresses and not sizeof(int) quantities
@@ -168,13 +173,11 @@ main(int argc, char *argv[]) {
 	  set_a_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[a+1]]);
     }
     set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
-   
+
     if (set_a_start == set_a_end) { continue ; }
 
-    // goodmatches is a basic heuristic for preventing any set_a's iteration
-    // from taking too long. Once sampling is effective, this can be removed
-    unsigned short int goodmatches = 0;
     printf("%9u %9u", set_id_a, set_a_length);
+    fflush(0);
     for (int b = a + 1; b < set_id_count; b++) {
       set_id_b = set_ids[b];
       set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
@@ -185,21 +188,31 @@ main(int argc, char *argv[]) {
       }
       set_b_length = (unsigned int)((char*)set_b_end - (char*)set_b_start);
 
-      intersection_count = set_intersection(
+      score = set_intersection(
         set_a_start, set_a_end, set_b_start, set_b_end
       );
 
-      // record "good" matches
-      if (intersection_count > good_threshold) {
-        write_result(fout,
-          set_id_a, set_id_b, intersection_count, set_a_length, set_b_length);
-        ++goodmatches;
-        // early out when we have "enough" good matches
-        if (goodmatches >= 100) { break; }
+      if (score > 0) {
+        // record the inner id and the score
+        memcpy(rs_iter++, (const void*)&set_id_b, sizeof(unsigned int));
+        memcpy(rs_iter++, (const void*)&score,    sizeof(unsigned int));
       }
-
     }
-    printf("%20d %20d \n", goodmatches, (int)time(NULL) - started_at);
+
+    unsigned int bytes_used = (char*)rs_iter - (char*)result_set;
+    qsort(result_set, bytes_used , 2 * sizeof(unsigned int), int_cmp);
+
+    // write at least 50 non-zero results, sorted
+    for (short int i = 0; i < 100; i += 2) {
+      write_result(fout, set_id_a, result_set[i], result_set[i+1]);
+      if (i > (bytes_used / sizeof(unsigned int) / 2)) { break; }
+    }
+
+    printf(
+      " * %20lu %20d \n",
+      bytes_used / sizeof(unsigned int),
+      (int)time(NULL) - started_at
+    );
     if (0 == set_id_a % 10) { print_progress_headers(); }
   }
   printf("\nSuggestomatic success!\n");
