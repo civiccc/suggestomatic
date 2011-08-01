@@ -171,6 +171,8 @@ main(int argc, char *argv[]) {
   }
 
   print_progress_headers();
+  struct null_integer bloom_item;
+  bloom_item.zero = 0x0;
   for (int a = begin_at; a < set_id_count; a++) {
     // 2 => (set_id_b, score)
     unsigned int* rs_iter = result_set;
@@ -184,25 +186,24 @@ main(int argc, char *argv[]) {
     } else {
 	  set_a_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[a+1]]);
     }
-    set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
+    set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start) / sizeof(unsigned int);
 
     // by no means a permanent fix, this means we can at get some
     // recommendations for the smaller sets
-    if (set_a_length > 100000) {
+    bloom_t *set_a_bloom = NULL;
+    if (set_a_length > 40000) {
       printf("Preparing bloom filter... ");
       fflush(0);
       bloom_t *set_a_bloom = bloom_filter_new(2500000);
       unsigned int *set_a_iter = set_a_start;
+      unsigned int i = 0;
       while (set_a_iter < set_a_end) {
-        struct null_integer item;
-        item.id = *set_a_iter++;
-        if (item.id == 0) { continue; }
-        printf("%u\n", item.id);
-        item.zero = 0x0;
-        bloom_filter_add(set_a_bloom, (char*)&item);
+        bloom_item.id = *set_a_iter++;
+        if (bloom_item.id == 0) { continue; }
+        bloom_filter_add(set_a_bloom, (char*)&bloom_item);
+        i += bloom_filter_contains(set_a_bloom, (char*)&bloom_item);
       }
-      printf("Done.\n");
-      }
+      printf("Done: %d elements.\n", i);
     }
 
     if (set_a_start == set_a_end) { continue ; }
@@ -219,9 +220,18 @@ main(int argc, char *argv[]) {
       }
       set_b_length = (unsigned int)((char*)set_b_end - (char*)set_b_start);
 
-      score = set_intersection(
-        set_a_start, set_a_end, set_b_start, set_b_end
-      );
+      if (set_a_length > 40000) {
+        score = 0;
+        for (unsigned int *set_b_ele = set_b_start; set_b_ele < set_b_end; set_b_ele++) {
+          bloom_item.id = *set_b_ele;
+          score += bloom_filter_contains(set_a_bloom, (char*)&bloom_item);
+        }
+        if (score > 0) { printf("%d\n", score); }
+      } else {
+        score = set_intersection(
+          set_a_start, set_a_end, set_b_start, set_b_end
+        );
+      }
 
       if (score > 0) {
         // record the inner id and the score
@@ -229,7 +239,7 @@ main(int argc, char *argv[]) {
         memcpy(rs_iter++, (const void*)&score,    sizeof(unsigned int));
       }
     }
-
+    if (NULL != set_a_bloom) { bloom_filter_free(set_a_bloom); }
     unsigned int bytes_used = (char*)rs_iter - (char*)result_set;
     qsort(result_set, bytes_used , 2 * sizeof(unsigned int), int_cmp);
 
