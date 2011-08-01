@@ -174,6 +174,10 @@ main(int argc, char *argv[]) {
     }
     set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
 
+    // by no means a permanent fix, this means we can at get some
+    // recommendations for the smaller sets
+    if (set_a_length > 100000) { continue ; }
+
     if (set_a_start == set_a_end) { continue ; }
 
     printf("%9u %9u", set_id_a, set_a_length);
