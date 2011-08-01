@@ -157,7 +157,11 @@ main(int argc, char *argv[]) {
   int started_at = (int)time(NULL);
   unsigned int set_id_a, set_id_b, set_a_length, set_b_length;
   unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
-  unsigned int* result_set = (unsigned int*)malloc(set_id_count * 2 * sizeof(int));
+  unsigned int *result_set = (unsigned int*)malloc(set_id_count * 2 * sizeof(int));
+  if (result_set == NULL) {
+    printf("Out of memory.\n");
+    exit(EXIT_FAILURE);
+  }
 
   print_progress_headers();
   for (int a = begin_at; a < set_id_count; a++) {
