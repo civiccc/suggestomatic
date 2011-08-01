@@ -12,6 +12,9 @@
 #include "vendor/bloom/bloom.h"
 #include "vendor/bloom/bloom.c"
 
+#define BLOOM_THRESHOLD 40000
+#define BLOOM_SIZE 2500000
+
 unsigned int
 set_intersection(
     const unsigned int* set_a,
@@ -189,26 +192,25 @@ main(int argc, char *argv[]) {
     }
     set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start) / sizeof(unsigned int);
 
-    // by no means a permanent fix, this means we can at get some
-    // recommendations for the smaller sets
+    if (set_a_start == set_a_end) { continue ; }
+
+    // if set_a is large enough that it is likely to become the limiting factor,
+    // build a bloom filter so that set_b can be enumerated and membership in
+    // set_a checked via the bloom filter
     bloom_t *set_a_bloom = NULL;
-    if (set_a_length > 40000) {
-      set_a_bloom = bloom_filter_new(2500000);
+    if (set_a_length > BLOOM_THRESHOLD) {
+      set_a_bloom = bloom_filter_new(BLOOM_SIZE);
       if (NULL == set_a_bloom) {
         perror(NULL);
         return EXIT_FAILURE;
       }
       unsigned int *set_a_iter = set_a_start;
-      unsigned int i = 0;
       while (set_a_iter < set_a_end) {
         bloom_item.id = *set_a_iter++;
         if (bloom_item.id == 0) { continue; }
         bloom_filter_add(set_a_bloom, bloom_key);
-        i += bloom_filter_contains(set_a_bloom, bloom_key);
       }
     }
-
-    if (set_a_start == set_a_end) { continue ; }
 
     printf("%9u %9u %9u", a, set_id_a, set_a_length);
     if (NULL != set_a_bloom) { printf("*"); }
@@ -221,9 +223,12 @@ main(int argc, char *argv[]) {
       } else {
         set_b_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[b+1]]);
       }
-      set_b_length = (unsigned int)((char*)set_b_end - (char*)set_b_start);
+      set_b_length = (unsigned int)((char*)set_b_end - (char*)set_b_start) / sizeof(unsigned int);
 
-      if (set_a_bloom != NULL) {
+      // bloom filter exists and set_b is small enough that the bloom filter
+      // scoring function is likely to be faster than the full intersection.
+      // Note that for similarly sized sets, standard set_intersection is faster
+      if (set_a_bloom != NULL && set_b_length < BLOOM_THRESHOLD) {
         score = 0;
         for (unsigned int *set_b_ele = set_b_start; set_b_ele < set_b_end; set_b_ele++) {
           bloom_item.id = *set_b_ele;
@@ -243,7 +248,8 @@ main(int argc, char *argv[]) {
     }
     if (NULL != set_a_bloom) { bloom_filter_free(set_a_bloom); }
     unsigned int bytes_used = (char*)rs_iter - (char*)result_set;
-    qsort(result_set, bytes_used , 2 * sizeof(unsigned int), int_cmp);
+    unsigned int num_elements = bytes_used / sizeof(unsigned int);
+    qsort(result_set, num_elements, 2 * sizeof(unsigned int), int_cmp);
 
     // write at least 50 non-zero results, sorted
     for (short int i = 0; i < 100; i += 2) {
