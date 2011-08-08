@@ -81,6 +81,7 @@ void write_result(
     unsigned int set_id_b,
     double intersection_percent) {
   fprintf(fout, "%d,%d,%f\n", set_id_a, set_id_b, intersection_percent);
+  fflush(fout);
 }
 
 void
@@ -95,8 +96,8 @@ first_10_elements(unsigned int *head, char *filename) {
 
 void print_progress_headers() {
   printf(
-    "%9s %9s %20s %20s \n",
-    "id a", "length", "good matches", "time elapsed (s)"
+    "%9s %9s %9s %20s %20s \n",
+    "pid", "id a", "length", "good matches", "time elapsed (s)"
   );
 }
 
@@ -109,6 +110,7 @@ void similarity_for_set(
     unsigned int* indexptr,
     unsigned int* arraysptr,
     struct fileinfo arrays) {
+
   clock_t started_at = clock();
   unsigned int set_id_a = set_ids[set_index],
                set_id_b, set_a_length;
@@ -145,7 +147,6 @@ void similarity_for_set(
 
     // Calculate the percentage of set_a that intersects with set_b.
     double intersection_percent = ((double) intersection_count)/set_a_length;
-
     // record "good" matches
     if (intersection_percent >= good_threshold) {
       write_result(fout, set_id_a, set_id_b, intersection_percent);
@@ -155,7 +156,8 @@ void similarity_for_set(
     }
   }
   printf(
-    "%9u %9u %20d %6.4f \n",
+    "%9u %9u %9u %20d %20.4f \n",
+    (unsigned int)getpid(),
     set_id_a, set_a_length,
     goodmatches,
     ((float)clock() - started_at) / CLOCKS_PER_SEC
@@ -217,24 +219,26 @@ main(int argc, char *argv[]) {
   // visual inspection sanity check
   first_10_elements((unsigned int*)arrays.head, set_members_filename);
 
-  FILE *fout = fopen(suggestions_filename, "w");
 
   pid_t pids[NUM_PROCESSES];
   int active_pids = NUM_PROCESSES;
-  unsigned short offset = 0;
+  printf("Spinning up %d worker processes...\n", NUM_PROCESSES);
+  print_progress_headers();
   for (int i = 0; i < active_pids; i++) {
     pids[i] = fork();
-    if (pids[i]< 0) {
+    if (pids[i] < 0) {
       perror(NULL);
+      return EXIT_FAILURE;
     } else if (pids[i] == 0) {
-      printf("In a child..\n");
       unsigned long intersection_count;
       int started_at = (int)time(NULL);
+      char *process_filename = malloc(80);
+      sprintf(process_filename, "%s.%u", suggestions_filename, i);
+      FILE* fout = fopen(process_filename, "w");
     
-      print_progress_headers();
-      for (int a = begin_at; a < set_id_count; a+= NUM_PROCESSES) {
+      for (int a = begin_at + i; a < set_id_count; a+= NUM_PROCESSES) {
         similarity_for_set(
-          offset++ + a,
+          a,
           fout,
           good_threshold,
           set_ids,
@@ -245,20 +249,19 @@ main(int argc, char *argv[]) {
         );
         if (0 == a % 10) { print_progress_headers(); }
       }
-    } else {
-      printf("vfork(2) produced pid %d\n", pids[i]);
+      fclose(fout);
+      printf("Segment starting at %d finished\n", begin_at + i);
+      return EXIT_SUCCESS;
     }
   }
 
   pid_t pid;
   int status;
-  sleep(60);
   while (active_pids > 0) {
     pid = wait(&status);
     printf("Child with PID %ld exited with status 0x%x.\n", (long)pid, status);
     active_pids--;
   }
-  //fclose(fout);
   printf("\nSuggestomatic success!\n");
   return EXIT_SUCCESS;
 }
