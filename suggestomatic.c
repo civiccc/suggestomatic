@@ -98,6 +98,68 @@ void print_progress_headers() {
   );
 }
 
+void similarity_for_set(
+    unsigned int set_index,
+    FILE* fout,
+    float good_threshold,
+    unsigned int* set_ids,
+    unsigned int set_id_count,
+    unsigned int* indexptr,
+    unsigned int* arraysptr,
+    struct fileinfo arrays) {
+  clock_t started_at = clock();
+  unsigned int set_id_a = set_ids[set_index],
+               set_id_b, set_a_length;
+  unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
+  // be super careful to subtract addresses and not sizeof(int) quantities
+  set_a_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_a]);
+  if (set_index + 1 == set_id_count) {
+    set_a_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
+  } else {
+	  set_a_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[set_index+1]]);
+  }
+  set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
+
+  if (set_a_start == set_a_end) { return; }
+
+  // goodmatches is a basic heuristic for preventing any set_a's iteration
+  // from taking too long. Once sampling is effective, this can be removed
+  unsigned short int goodmatches = 0;
+  for (int b = set_index + 1; b < set_id_count; b++) {
+    // We don't compare sets to themselves.
+    if (set_index == b) { continue; }
+
+    set_id_b = set_ids[b];
+    set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
+    if (set_index + 1 == set_id_count) {
+      set_b_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
+    } else {
+      set_b_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[b+1]]);
+    }
+
+    unsigned int intersection_count = set_intersection(
+      set_a_start, set_a_end, set_b_start, set_b_end
+    );
+
+    // Calculate the percentage of set_a that intersects with set_b.
+    double intersection_percent = ((double) intersection_count)/set_a_length;
+
+    // record "good" matches
+    if (intersection_percent >= good_threshold) {
+      write_result(fout, set_id_a, set_id_b, intersection_percent);
+      ++goodmatches;
+      // early out when we have "enough" good matches
+      if (goodmatches >= 100) { break; }
+    }
+  }
+  printf(
+    "%9u %9u %20d %6.4f \n",
+    set_id_a, set_a_length,
+    goodmatches,
+    ((float)clock() - started_at) / CLOCKS_PER_SEC
+  );
+}
+
 int
 main(int argc, char *argv[]) {
   if (test_set_intersection() != 0) {
@@ -144,67 +206,39 @@ main(int argc, char *argv[]) {
   first_10_elements((unsigned int*)arrays.head, set_members_filename);
 
   FILE *fout = fopen(suggestions_filename, "w");
-  unsigned long intersection_count;
-  int started_at = (int)time(NULL);
-  clock_t start = clock();
-  unsigned int set_id_a, set_id_b, set_a_length;
-  unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
 
-  print_progress_headers();
-  for (int a = begin_at; a < set_id_count; a++) {
-    set_id_a = set_ids[a];
-
-    // be super careful to subtract addresses and not sizeof(int) quantities
-    set_a_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_a]);
-    if (a + 1 == set_id_count) {
-      set_a_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
+  const unsigned int NUM_PROCESSES = 8;
+  unsigned short offset = 0;
+  for (int processes = 0; processes < NUM_PROCESSES; processes++) {
+    pid_t process_pid = vfork();
+    if (process_pid < 0) {
+      perror(NULL);
+    } else if (process_pid == 0) {
+      printf("In a child..\n");
+      unsigned long intersection_count;
+      int started_at = (int)time(NULL);
+    
+      print_progress_headers();
+      for (int a = begin_at; a < set_id_count; a+= NUM_PROCESSES) {
+        similarity_for_set(
+          offset++ + a,
+          fout,
+          good_threshold,
+          set_ids,
+          set_id_count,
+          indexptr,
+          arraysptr,
+          arrays
+        );
+        if (0 == a % 10) { print_progress_headers(); }
+      }
     } else {
-	  set_a_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[a+1]]);
+      printf("vfork(2) produced pid %d\n", process_pid);
     }
-    set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
-   
-    if (set_a_start == set_a_end) { continue ; }
-
-    // goodmatches is a basic heuristic for preventing any set_a's iteration
-    // from taking too long. Once sampling is effective, this can be removed
-    unsigned short int goodmatches = 0;
-    printf("%9u %9u", set_id_a, set_a_length);
-    for (int b = begin_at; b < set_id_count; b++) {
-      // We don't compare sets to themselves.
-      if (a == b) { continue; }
-
-      set_id_b = set_ids[b];
-      set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
-      if (a + 1 == set_id_count) {
-        set_b_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
-      } else {
-        set_b_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[b+1]]);
-      }
-
-      intersection_count = set_intersection(
-        set_a_start, set_a_end, set_b_start, set_b_end
-      );
-
-      // Calculate the percentage of set_a that intersects with set_b.
-      double intersection_percent = ((double) intersection_count)/set_a_length;
-
-      // record "good" matches
-      if (intersection_percent >= good_threshold) {
-        write_result(fout, set_id_a, set_id_b, intersection_percent);
-        ++goodmatches;
-        // early out when we have "enough" good matches
-        if (goodmatches >= 100) { break; }
-      }
-
-    }
-    printf("%20d %20d \n", goodmatches, (int)time(NULL) - started_at);
-    if (0 == set_id_a % 10) { print_progress_headers(); }
   }
-  fclose(fout);
+
+  //fclose(fout);
   printf("\nSuggestomatic success!\n");
-  clock_t end = clock();
-  double elapsed = (((double) (end - start)) / CLOCKS_PER_SEC) * 1000;
-  printf("CPU-time in ms: %f\n", elapsed);
   return EXIT_SUCCESS;
 }
 
