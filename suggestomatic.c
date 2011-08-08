@@ -106,18 +106,28 @@ main(int argc, char *argv[]) {
   printf("Smoke tests pass, starting engine\n");
 
   // set up command line params
-  char *set_ids_filename = argv[1],
-       *set_index_filename = argv[2],
-       *set_members_filename = argv[3],
-       *suggestions_filename = argv[4];
-  double good_threshold = atof(argv[5]);
+  unsigned short arg = 1;
+  char *set_ids_filename = argv[arg++],
+       *set_index_filename = argv[arg++],
+       *set_members_filename = argv[arg++],
+       *suggestions_filename = argv[arg++];
+  double good_threshold = atof(argv[arg++]);
 
   // optional param with default
   unsigned int begin_at = 0;
   if (argc > 6) {
-    begin_at = atoi(argv[6]);
+    begin_at = atoi(argv[arg]);
+    printf("Using optional begin_at parameter: %d \n", begin_at);
   }
-  printf("Beginning at set id %d", begin_at);
+
+  printf("%s\n", argv[0]);
+  printf("set_ids_filename: %s \n", set_ids_filename);
+  printf("set_index_filename: %s \n", set_index_filename);
+  printf("set_members_filename: %s \n", set_members_filename);
+  printf("suggestions_filename: %s \n", suggestions_filename);
+  printf("good_threshold: %.3f \n", good_threshold);
+  printf("begin_at: %d \n", begin_at);
+
 
   struct fileinfo set_ids_file = load_binary_file(set_ids_filename);
   unsigned int *set_ids = (unsigned int*)(set_ids_file.head);
