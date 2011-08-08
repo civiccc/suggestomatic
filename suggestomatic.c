@@ -12,7 +12,7 @@
 #include "vendor/bloom/bloom.h"
 #include "vendor/bloom/bloom.c"
 
-#define BLOOM_THRESHOLD 40000
+#define BLOOM_THRESHOLD 1
 #define BLOOM_SIZE 2500000
 
 unsigned int
@@ -104,8 +104,8 @@ first_10_elements(unsigned int *head, char *filename) {
 
 void print_progress_headers() {
   printf(
-    "%9s %9s %9s %20s %20s \n",
-    "id a", "set_id_a", "length", "non-0 matches", "time elapsed (s)"
+    "%9s %9s %9s %16s %16s %20s %20s \n",
+    "id a", "set_id_a", "length", "bloom (s)", "pointer (s)", "non-0 matches", "time elapsed (s)"
   );
 }
 
@@ -215,6 +215,7 @@ main(int argc, char *argv[]) {
     printf("%9u %9u %9u", a, set_id_a, set_a_length);
     if (NULL != set_a_bloom) { printf("*"); }
     fflush(0);
+    double overall_bloom = 0, overall_pointer = 0;
     for (int b = a + 1; b < set_id_count; b++) {
       set_id_b = set_ids[b];
       set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
@@ -228,24 +229,30 @@ main(int argc, char *argv[]) {
       // bloom filter exists and set_b is small enough that the bloom filter
       // scoring function is likely to be faster than the full intersection.
       // Note that for similarly sized sets, standard set_intersection is faster
+      clock_t start_bloom = clock();
       if (set_a_bloom != NULL && set_b_length < BLOOM_THRESHOLD) {
         score = 0;
         for (unsigned int *set_b_ele = set_b_start; set_b_ele < set_b_end; set_b_ele++) {
           bloom_item.id = *set_b_ele;
           score += bloom_filter_contains(set_a_bloom, bloom_key);
         }
-      } else {
-        score = set_intersection(
-          set_a_start, set_a_end, set_b_start, set_b_end
-        );
       }
-
+      overall_bloom += clock() - start_bloom;
+      clock_t start_pointer = clock();
+      score = set_intersection(
+        set_a_start, set_a_end, set_b_start, set_b_end
+      );
+      overall_pointer = clock() - start_pointer;
       if (score > 0) {
         // record the inner id and the score
         memcpy(rs_iter++, (const void*)&set_id_b, sizeof(unsigned int));
         memcpy(rs_iter++, (const void*)&score,    sizeof(unsigned int));
       }
     }
+    overall_bloom /= (double)CLOCKS_PER_SEC;
+    overall_pointer /= (double)CLOCKS_PER_SEC;
+    printf(" %14.6f %14.6f ", overall_bloom, overall_pointer);
+
     if (NULL != set_a_bloom) { bloom_filter_free(set_a_bloom); }
     unsigned int bytes_used = (char*)rs_iter - (char*)result_set;
     unsigned int num_elements = bytes_used / sizeof(unsigned int);
