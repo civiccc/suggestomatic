@@ -9,6 +9,8 @@
 #include <sys/mman.h>
 #include <time.h>
 
+#define NUM_PROCESSES 8
+
 unsigned int
 set_intersection(
     const unsigned int* set_a,
@@ -207,13 +209,14 @@ main(int argc, char *argv[]) {
 
   FILE *fout = fopen(suggestions_filename, "w");
 
-  const unsigned int NUM_PROCESSES = 8;
+  pid_t pids[NUM_PROCESSES];
+  int active_pids = NUM_PROCESSES;
   unsigned short offset = 0;
-  for (int processes = 0; processes < NUM_PROCESSES; processes++) {
-    pid_t process_pid = vfork();
-    if (process_pid < 0) {
+  for (int i = 0; i < active_pids; i++) {
+    pids[i] = fork();
+    if (pids[i]< 0) {
       perror(NULL);
-    } else if (process_pid == 0) {
+    } else if (pids[i] == 0) {
       printf("In a child..\n");
       unsigned long intersection_count;
       int started_at = (int)time(NULL);
@@ -233,10 +236,18 @@ main(int argc, char *argv[]) {
         if (0 == a % 10) { print_progress_headers(); }
       }
     } else {
-      printf("vfork(2) produced pid %d\n", process_pid);
+      printf("vfork(2) produced pid %d\n", pids[i]);
     }
   }
 
+  pid_t pid;
+  int status;
+  sleep(60);
+  while (active_pids > 0) {
+    pid = wait(&status);
+    printf("Child with PID %ld exited with status 0x%x.\n", (long)pid, status);
+    active_pids--;
+  }
   //fclose(fout);
   printf("\nSuggestomatic success!\n");
   return EXIT_SUCCESS;
