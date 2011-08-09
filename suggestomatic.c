@@ -9,6 +9,8 @@
 #include <sys/mman.h>
 #include <time.h>
 
+#define NUM_PROCESSES 8
+
 unsigned int
 set_intersection(
     const unsigned int* set_a,
@@ -79,6 +81,7 @@ void write_result(
     unsigned int set_id_b,
     double intersection_percent) {
   fprintf(fout, "%d,%d,%f\n", set_id_a, set_id_b, intersection_percent);
+  fflush(fout);
 }
 
 void
@@ -93,8 +96,71 @@ first_10_elements(unsigned int *head, char *filename) {
 
 void print_progress_headers() {
   printf(
-    "%9s %9s %20s %20s \n",
-    "id a", "length", "good matches", "time elapsed (s)"
+    "%9s %9s %9s %20s %20s \n",
+    "pid", "id a", "length", "good matches", "time elapsed (s)"
+  );
+}
+
+void similarity_for_set(
+    unsigned int set_index,
+    FILE* fout,
+    float good_threshold,
+    unsigned int* set_ids,
+    unsigned int set_id_count,
+    unsigned int* indexptr,
+    unsigned int* arraysptr,
+    struct fileinfo arrays) {
+
+  clock_t started_at = clock();
+  unsigned int set_id_a = set_ids[set_index],
+               set_id_b, set_a_length;
+  unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
+  // be super careful to subtract addresses and not sizeof(int) quantities
+  set_a_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_a]);
+  if (set_index + 1 == set_id_count) {
+    set_a_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
+  } else {
+	  set_a_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[set_index+1]]);
+  }
+  set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
+
+  if (set_a_start == set_a_end) { return; }
+
+  // goodmatches is a basic heuristic for preventing any set_a's iteration
+  // from taking too long. Once sampling is effective, this can be removed
+  unsigned short int goodmatches = 0;
+  for (int b = set_index + 1; b < set_id_count; b++) {
+    // We don't compare sets to themselves.
+    if (set_index == b) { continue; }
+
+    set_id_b = set_ids[b];
+    set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
+    if (set_index + 1 == set_id_count) {
+      set_b_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
+    } else {
+      set_b_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[b+1]]);
+    }
+
+    unsigned int intersection_count = set_intersection(
+      set_a_start, set_a_end, set_b_start, set_b_end
+    );
+
+    // Calculate the percentage of set_a that intersects with set_b.
+    double intersection_percent = ((double) intersection_count)/set_a_length;
+    // record "good" matches
+    if (intersection_percent >= good_threshold) {
+      write_result(fout, set_id_a, set_id_b, intersection_percent);
+      ++goodmatches;
+      // early out when we have "enough" good matches
+      if (goodmatches >= 100) { break; }
+    }
+  }
+  printf(
+    "%9u %9u %9u %20d %20.4f \n",
+    (unsigned int)getpid(),
+    set_id_a, set_a_length,
+    goodmatches,
+    ((float)clock() - started_at) / CLOCKS_PER_SEC
   );
 }
 
@@ -153,68 +219,50 @@ main(int argc, char *argv[]) {
   // visual inspection sanity check
   first_10_elements((unsigned int*)arrays.head, set_members_filename);
 
-  FILE *fout = fopen(suggestions_filename, "w");
-  unsigned long intersection_count;
-  int started_at = (int)time(NULL);
-  clock_t start = clock();
-  unsigned int set_id_a, set_id_b, set_a_length;
-  unsigned int *set_a_start, *set_a_end, *set_b_start, *set_b_end;
 
+  pid_t pids[NUM_PROCESSES];
+  int active_pids = NUM_PROCESSES;
+  printf("Spinning up %d worker processes...\n", NUM_PROCESSES);
   print_progress_headers();
-  for (int a = begin_at; a < set_id_count; a++) {
-    set_id_a = set_ids[a];
-
-    // be super careful to subtract addresses and not sizeof(int) quantities
-    set_a_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_a]);
-    if (a + 1 == set_id_count) {
-      set_a_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
-    } else {
-	  set_a_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[a+1]]);
-    }
-    set_a_length = (unsigned int)((char*)set_a_end - (char*)set_a_start);
-   
-    if (set_a_start == set_a_end) { continue ; }
-
-    // goodmatches is a basic heuristic for preventing any set_a's iteration
-    // from taking too long. Once sampling is effective, this can be removed
-    unsigned short int goodmatches = 0;
-    printf("%9u %9u", set_id_a, set_a_length);
-    for (int b = begin_at; b < set_id_count; b++) {
-      // We don't compare sets to themselves.
-      if (a == b) { continue; }
-
-      set_id_b = set_ids[b];
-      set_b_start = (unsigned int*)((char*)arraysptr + indexptr[set_id_b]);
-      if (a + 1 == set_id_count) {
-        set_b_end = (unsigned int*)((char*)arraysptr + arrays.filesize);
-      } else {
-        set_b_end = (unsigned int*)((char*)arraysptr + indexptr[set_ids[b+1]]);
+  for (int i = 0; i < active_pids; i++) {
+    pids[i] = fork();
+    if (pids[i] < 0) {
+      perror(NULL);
+      return EXIT_FAILURE;
+    } else if (pids[i] == 0) {
+      unsigned long intersection_count;
+      int started_at = (int)time(NULL);
+      char *process_filename = malloc(80);
+      sprintf(process_filename, "%s.%u", suggestions_filename, i);
+      FILE* fout = fopen(process_filename, "w");
+    
+      for (int a = begin_at + i; a < set_id_count; a+= NUM_PROCESSES) {
+        similarity_for_set(
+          a,
+          fout,
+          good_threshold,
+          set_ids,
+          set_id_count,
+          indexptr,
+          arraysptr,
+          arrays
+        );
+        if (0 == a % 10) { print_progress_headers(); }
       }
-
-      intersection_count = set_intersection(
-        set_a_start, set_a_end, set_b_start, set_b_end
-      );
-
-      // Calculate the percentage of set_a that intersects with set_b.
-      double intersection_percent = ((double) intersection_count)/set_a_length;
-
-      // record "good" matches
-      if (intersection_percent >= good_threshold) {
-        write_result(fout, set_id_a, set_id_b, intersection_percent);
-        ++goodmatches;
-        // early out when we have "enough" good matches
-        if (goodmatches >= 100) { break; }
-      }
-
+      fclose(fout);
+      printf("Segment starting at %d finished\n", begin_at + i);
+      return EXIT_SUCCESS;
     }
-    printf("%20d %20d \n", goodmatches, (int)time(NULL) - started_at);
-    if (0 == set_id_a % 10) { print_progress_headers(); }
   }
-  fclose(fout);
+
+  pid_t pid;
+  int status;
+  while (active_pids > 0) {
+    pid = wait(&status);
+    printf("Child with PID %ld exited with status 0x%x.\n", (long)pid, status);
+    active_pids--;
+  }
   printf("\nSuggestomatic success!\n");
-  clock_t end = clock();
-  double elapsed = (((double) (end - start)) / CLOCKS_PER_SEC) * 1000;
-  printf("CPU-time in ms: %f\n", elapsed);
   return EXIT_SUCCESS;
 }
 
