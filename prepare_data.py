@@ -91,7 +91,7 @@ def load_membership_file(filename):
 in_pairs = lambda xs: [tuple(xs[i:i+2]) for i in range(0, len(xs), 2)]
 
 def fill_buffer(fin, BUFFERSIZE):
-  """Read `INTCOUNT` integers from file handle `fin` and return array of ints""" 
+  """Read `INTCOUNT` integers from file handle `fin` and return array of ints"""
   set_id_array = array.array('I')
   try:
     set_id_array.fromfile(fin, (INTCOUNT))
@@ -245,8 +245,8 @@ if __name__ == '__main__':
     options.set_id_filename,
     options.set_members_index_filename,
     options.set_membership_arrays_filename,
-    '0',
     'suggestions.csv'
+    '0.05',
   )))
 
 
