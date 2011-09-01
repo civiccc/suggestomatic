@@ -1,4 +1,7 @@
 *.o
+*.pyc
 suggestomatic
-results.log
 .*.sw*
+*.csv
+*.bin
+*.pickle
