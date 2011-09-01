@@ -23,6 +23,9 @@ def parseargs():
     help='Binary array or arrays of member_id unsigned int_32s')
   addarg('--suggestions-filename', type=str,
     help='Output filename prefix')
+  addarg('--timing-filename', type=str,
+    default='timing.csv',
+    help='Output timing info filename')
   addarg('--begin-at', type=int, default=0)
   return parser.parse_args()
 
@@ -92,13 +95,15 @@ class Suggestomatic:
           print 'Set b: %s, loading %.3f / scoring: %.3f' % (
             len(set_b), timing['loading'], timing['scoring'])
 
-        if score > 1: import pdb; pdb.set_trace()
         if score > 0:
           set_a_scores.append((set_b_id, score))
-        if i % 5000 == 0: print i, time.time() - start_time
+        if i % 5000 == 0: print 'progress', i, time.time() - start_time
+
+      with open(options.timing_filename, 'a+') as fh:
+        fh.write("%s,%s\n" % (len(set_a), time.time() - start_time))
 
       print "Compared %d (size %d) to %d other sets" % (set_a_id, set_a_length, i)
-      with open('suggestions.csv', 'w+') as fh:
+      with open('suggestions.csv', 'a+') as fh:
         for set_id, score in sorted(set_a_scores, key=lambda x: x[1], reverse=True)[:25]:
           fh.write('%s,%s,%s\n' % (set_a_id, set_id, score))
 
