@@ -78,7 +78,10 @@ class Suggestomatic:
         if score > 0:
           set_a_scores.append((set_b_id, score))
         if i % 1000 == 0: print i, time.time() - start_time
-      set_a_scores.sort(key=lambda x: x[1], reverse=True)
+
+      with open('suggestions.csv', 'w+') as result_fh:
+        for set_id, score in set_a_sorted(key=lambda x: x[1], reverse=True)[:25]:
+          result_fh.write('%s,%s\n' % (set_id, score))
 
 # http://docs.python.org/library/bisect.html#searching-sorted-lists
 import bisect
