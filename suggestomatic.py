@@ -57,21 +57,22 @@ class Suggestomatic:
     set_members_array.fromstring(first_ten)
     print_first_ten(options.set_members_filename, set_members_array)
 
-    def load_set_array(set_id):
-      start, end = [set_index_array[offset] for offset in (set_id, set_id+1)]
-      if end == 0: end = start
+    def load_set_array(set_id, next_set_id):
+      start, end = [set_index_array[offset] for offset in (set_id, next_set_id)]
       set_members_mmap.seek(start)
       s = array.array('I')
       s.fromstring(set_members_mmap.read(end - start))
       return s
 
-    for set_a_id in set_ids_array:
-      set_a = load_set_array(set_a_id)
+    for j, set_a_id in enumerate(set_ids_array):
+      set_a_next_id = set_ids_array[j+1]
+      set_a = load_set_array(set_a_id, set_a_next_id)
       set_a_length = float(len(set_a))
       set_a_scores = []
       start_time = time.time()
       for i, set_b_id in enumerate(set_ids_array):
-        set_b = load_set_array(set_b_id)
+        set_b_next_id = set_ids_array[i+1]
+        set_b = load_set_array(set_b_id, set_b_next_id)
         intersections = bisect_intersection(set_a, set_b)
         score = intersections / set_a_length
         if score > 1: import pdb; pdb.set_trace()
