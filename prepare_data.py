@@ -205,6 +205,7 @@ if __name__ == '__main__':
   set_ids = load_or_enumerate_set_ids()
   set_array_offsets = dict()
 
+  set_start_end_offsets = {}
   log.info("Reading in %d integers at a time" % INTCOUNT)
   for set_id_segment in (set_ids[i:i+SEGSIZE] for i in xrange(0, len(set_ids), SEGSIZE)):
     log.info("Starting segment %d" % (int(set_ids.index(set_id_segment[0])) / SEGSIZE))
@@ -215,7 +216,6 @@ if __name__ == '__main__':
     log.info('The biggest set has `%d` members' % max(lens))
 
     small_sets = 0
-    set_start_end_offsets = {}
     with open(options.set_membership_arrays_filename, 'ab+') as fout:
       for set_id, member_ids in set_membership.iteritems():
         if len(member_ids) <= 1: # drop one member sets
@@ -243,7 +243,7 @@ if __name__ == '__main__':
       )
     log.info("Skipped %d sets with 1 member" % small_sets)
     log.info("Serializing index start/end offsets...")
-    with open(options.set_members_index_filename + '.pickle', 'a+') as fh:
+    with open(options.set_members_index_filename + '.pickle', 'w+') as fh:
       pickle.dump(set_start_end_offsets, fh)
       log.info("Done")
 
