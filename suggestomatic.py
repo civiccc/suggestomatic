@@ -71,10 +71,20 @@ class Suggestomatic:
       set_a_scores = []
       start_time = time.time()
       for i, set_b_id in enumerate(set_ids_array):
+        start = time.time()
+        timing = {}
         set_b_next_id = set_ids_array[i+1]
         set_b = load_set_array(set_b_id, set_b_next_id)
+        timing['loading'] = time.time() - start ; start = time.time()
         intersections = bisect_intersection(set_a, set_b)
+        timing['intersections'] = time.time() - start ; start = time.time()
+        if set_a_length == 0: set_a_length = .0000001
         score = intersections / set_a_length
+
+        if sum(timing.values()) > 1.0:
+          print 'Set b: %s, loading %.3f / calculating: %.3f' % (
+            len(set_b), timing['loading'], timing['intersections'])
+
         if score > 1: import pdb; pdb.set_trace()
         if score > 0:
           set_a_scores.append((set_b_id, score))
