@@ -30,16 +30,16 @@ def parseargs():
   addarg('--membership-csv', type=str,
     help='(i) set membership CSV of form (user_id, set_id')
   addarg('--membership-filename', type=str,
-    default='%s-membership.bin' % time.time(),
+    default='%s-membership.bin' % timestamp,
     help='(i) set membership binary image filename')
   addarg('--set-membership-arrays-filename', type=str,
-    default='%s-set-members.bin' % time.time(),
+    default='%s-set-members.bin' % timestamp,
     help='(o) Array of member_id ararys filename')
   addarg('--set-members-index-filename', type=str,
-    default='%s-set-members-index.bin' % time.time(),
+    default='%s-set-members-index.bin' % timestamp,
     help='(o) Index array into set members arrays filename')
   addarg('--set-id-filename', type=str,
-    default='%s-set-ids.bin' % time.time(),
+    default='%s-set-ids.bin' % timestamp,
     help='(i/o) Array of set_ids filename')
   addarg('--small-group-threshold', type=int, default=1,
     help="Drop groups with less than or equal to this many members")
