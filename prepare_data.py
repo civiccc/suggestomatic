@@ -63,9 +63,11 @@ def membership_csv_to_bin(csv_filename, binary_filename):
   group_members = collections.defaultdict(int)
   with open(csv_filename) as csvfile:
     for i, line in enumerate(csvfile):
-      user_id, group_id = map(int, line.strip().split(','))
-      group_members[group_id] += 1
-      if i % 1000000 == 0: log.info("Progress: %d" % i)
+      try:
+        user_id, group_id = map(int, line.strip().split(','))
+        group_members[group_id] += 1
+        if i % 1000000 == 0: log.info("Progress: %d" % i)
+      except ValueError: pass
 
   f = lambda id: group_members[id] <= options.small_group_threshold
   group_id_blacklist = set(id for id in group_members if f(id))
