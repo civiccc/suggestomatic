@@ -253,7 +253,7 @@ if __name__ == '__main__':
     options.set_id_filename,
     options.set_members_index_filename,
     options.set_membership_arrays_filename,
-    'suggestions.csv'
+    'suggestions.csv',
     '0.05',
   )))
 
