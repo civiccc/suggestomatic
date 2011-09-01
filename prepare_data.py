@@ -2,11 +2,12 @@
 
 import argparse
 import array
-import datetime
 import collections
 from compat import itertools
+import datetime
 import logging
 import os.path
+import pickle
 import struct
 import sys
 import time
@@ -188,7 +189,7 @@ def generate_index(index_filename, set_array_offsets):
 BUFFERSIZE = 1024 * 64
 SIZEOFINT = 4
 INTCOUNT = BUFFERSIZE / SIZEOFINT
-SEGSIZE = 10000
+SEGSIZE = 20000
 
 if __name__ == '__main__':
   options = parseargs()
@@ -214,6 +215,7 @@ if __name__ == '__main__':
     log.info('The biggest set has `%d` members' % max(lens))
 
     small_sets = 0
+    set_start_end_offsets = {}
     with open(options.set_membership_arrays_filename, 'ab+') as fout:
       for set_id, member_ids in set_membership.iteritems():
         if len(member_ids) <= 1: # drop one member sets
@@ -232,13 +234,19 @@ if __name__ == '__main__':
         log.debug("Offset %d, set_id %s, %d actual bytes written" % (
           fout.tell(), set_id, fout.tell() - file_offset
         ))
+        set_start_end_offsets[set_id] = (
+          file_offset,
+          file_offset + len(member_ids) * member_id_array.itemsize
+        )
       log.info("%d bytes written to %s" %
         (fout.tell(), options.set_membership_arrays_filename)
       )
     log.info("Skipped %d sets with 1 member" % small_sets)
+    log.info("Serializing index start/end offsets...")
+    with open(options.set_members_index_filename + '.pickle', 'a+') as fh:
+      pickle.dump(set_start_end_offsets, fh)
+      log.info("Done")
 
-  verify_results(options.set_membership_arrays_filename, set_array_offsets)
-  generate_index(options.set_members_index_filename, set_array_offsets)
   log.info('Finished preparing data for Suggestomatic. To start, run:')
   log.info(' '.join((
     './suggestomatic',
