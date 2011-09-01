@@ -63,7 +63,7 @@ class Suggestomatic:
       set_members_mmap.seek(start)
       s = array.array('I')
       s.fromstring(set_members_mmap.read(end - start))
-      return frozenset(s)
+      return s
 
     for set_a_id in set_ids_array:
       set_a = load_set_array(set_a_id)
@@ -72,11 +72,25 @@ class Suggestomatic:
       start_time = time.time()
       for i, set_b_id in enumerate(set_ids_array):
         set_b = load_set_array(set_b_id)
-        score = len(set_a & set_b) / set_a_length
+        intersections = bisect_intersection(set_a, set_b)
+        score = intersections / set_a_length
+        if score > 1: import pdb; pdb.set_trace()
         if score > 0:
           set_a_scores.append((set_b_id, score))
         if i % 1000 == 0: print i, time.time() - start_time
-      import pdb; pdb.set_trace()
+      set_a_scores.sort(key=lambda x: x[1], reverse=True)
+
+# http://docs.python.org/library/bisect.html#searching-sorted-lists
+import bisect
+def bisect_index(haystack, needle):
+    '''Locate the leftmost value exactly equal to needle'''
+    i = bisect.bisect_left(haystack, needle)
+    return i != len(haystack) and haystack[i] == needle
+
+def bisect_intersection(list_a, list_b):
+    big_set = list_a if len(list_a) > len(list_b) else list_b
+    small_set = list_a if len(list_a) <= len(list_b) else list_b
+    return sum(1 for number in small_set if bisect_index(big_set, number))
 
 if __name__ == '__main__':
   Suggestomatic().run()
