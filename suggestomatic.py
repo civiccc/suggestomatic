@@ -2,6 +2,7 @@ import argparse
 import array
 import bisect
 import mmap
+import multiprocessing
 import os
 import pickle
 import struct
@@ -40,26 +41,79 @@ def load_binary_array(filename):
 
 # http://docs.python.org/library/bisect.html#searching-sorted-lists
 def bisect_index(haystack, needle):
-    '''Locate the leftmost value exactly equal to needle'''
-    i = bisect.bisect_left(haystack, needle)
-    return i != len(haystack) and haystack[i] == needle
+  '''Locate the leftmost value exactly equal to needle'''
+  i = bisect.bisect_left(haystack, needle)
+  return i != len(haystack) and haystack[i] == needle
 
 def bisect_intersection(list_a, list_b):
-    big_set = list_a if len(list_a) > len(list_b) else list_b
-    small_set = list_a if len(list_a) <= len(list_b) else list_b
-    return sum(1 for number in small_set if bisect_index(big_set, number))
+  big_set = list_a if len(list_a) > len(list_b) else list_b
+  small_set = list_a if len(list_a) <= len(list_b) else list_b
+  return sum(1 for number in small_set if bisect_index(big_set, number))
+
+def advancing_intersection(list_a, list_b):
+  a_index, b_index = 0, 0
+  a_len, b_len = len(list_a), len(list_b)
+  intersections = 0
+  while a_index < a_len and b_index < b_len:
+    a, b = list_a[a_index], list_b[b_index]
+    if a > b: b_index += 1
+    elif a == b:
+      a_index += 1; b_index += 1
+      intersections += 1
+    else: a_index += 1
+  return intersections
+
+def load_set_array(set_members_mmap, start, end):
+  set_members_mmap.seek(start)
+  s = array.array('I')
+  s.fromstring(set_members_mmap.read(end - start))
+  return s
+
+def set_score(set_a, set_b):
+  start = time.time()
+  intersections = bisect_intersection(set_a, set_b)
+  bisect_timing = time.time() - start; start = time.time()
+  #advancing_intersections = advancing_intersection(set_a, set_b)
+  #advanced_timing = time.time() - start
+  if False and len(set_b) > 100000:
+    print (
+      "multiple", bisect_timing / advanced_timing,
+      "set size", len(set_b),
+    )
+  return intersections / float(len(set_a))
+
+def worker_func(set_a_id):
+  set_a = load_set_array(set_members_mmap, *set_index[set_a_id])
+  set_a_length = len(set_a)
+  set_a_scores = []
+  start_time = time.time()
+  for i, set_b_id in enumerate(set_ids):
+    start = time.time()
+    timing = {}
+    set_b = load_set_array(set_members_mmap, *set_index[set_b_id])
+    timing['loading'] = time.time() - start ; start = time.time()
+    score = set_score(set_a, set_b)
+    timing['scoring'] = time.time() - start ; start = time.time()
+
+    if sum(timing.values()) > 1.0:
+      print 'Set b: %s, loading %.3f / scoring: %.3f' % (
+        len(set_b), timing['loading'], timing['scoring'])
+
+    if score > 0:
+      set_a_scores.append((set_b_id, score))
+    if i % 5000 == 0: print 'progress, set id:', set_a_id, i, time.time() - start_time
+  sorted_scores = sorted(set_a_scores, key=lambda x: x[1], reverse=True)[:25]
+  return [(set_a_id, set_b_id, score) for set_b_id, score in sorted_scores]
+
+options = parseargs()
+# load the large members array of arrays
+with open(options.set_members_filename, 'rb') as fh:
+  set_members_mmap = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
+with open(options.set_index_filename, 'rb') as fh:
+  set_index = pickle.load(fh)
+  set_ids = sorted(set_index.keys())
 
 class Suggestomatic:
-  def load_set_array(self, start, end):
-    self.set_members_mmap.seek(start)
-    s = array.array('I')
-    s.fromstring(self.set_members_mmap.read(end - start))
-    return s
-
-  def score(self, set_a, set_b):
-    intersections = bisect_intersection(set_a, set_b)
-    return intersections / float(len(set_a))
-
   def run(self):
     options = parseargs()
     print options
@@ -69,43 +123,18 @@ class Suggestomatic:
       set_ids = sorted(set_index.keys())
       print_first_ten("set ids", set_ids)
 
-    # load the large members array of arrays
-    with open(options.set_members_filename, 'rb') as fh:
-      self.set_members_mmap = mmap.mmap(fh.fileno(), 0, access=mmap.ACCESS_READ)
-
     set_members_array = array.array('I')
-    first_ten = self.set_members_mmap.read(10 * set_members_array.itemsize)
+    first_ten = set_members_mmap.read(10 * set_members_array.itemsize)
     set_members_array.fromstring(first_ten)
     print_first_ten(options.set_members_filename, set_members_array)
 
-    for j, set_a_id in enumerate(set_ids[options.begin_at:]):
-      set_a = self.load_set_array(*set_index[set_a_id])
-      set_a_length = len(set_a)
-      set_a_scores = []
-      start_time = time.time()
-      for i, set_b_id in enumerate(set_ids):
-        start = time.time()
-        timing = {}
-        set_b = self.load_set_array(*set_index[set_b_id])
-        timing['loading'] = time.time() - start ; start = time.time()
-        score = self.score(set_a, set_b)
-        timing['scoring'] = time.time() - start ; start = time.time()
-
-        if sum(timing.values()) > 1.0:
-          print 'Set b: %s, loading %.3f / scoring: %.3f' % (
-            len(set_b), timing['loading'], timing['scoring'])
-
-        if score > 0:
-          set_a_scores.append((set_b_id, score))
-        if i % 5000 == 0: print 'progress', i, time.time() - start_time
-
-      with open(options.timing_filename, 'a+') as fh:
-        fh.write("%s,%s\n" % (len(set_a), time.time() - start_time))
-
-      print "Compared %d (size %d) to %d other sets" % (set_a_id, set_a_length, i)
+    for scores in multiprocessing.Pool().imap_unordered(
+        worker_func, set_ids[options.begin_at:]):
+      print "Finished set %d" % (scores[0][0])
       with open('suggestions.csv', 'a+') as fh:
-        for set_id, score in sorted(set_a_scores, key=lambda x: x[1], reverse=True)[:25]:
-          fh.write('%s,%s,%s\n' % (set_a_id, set_id, score))
+        for score in scores:
+          fh.write('%s,%s,%s\n' % score)
+
 
 if __name__ == '__main__':
   Suggestomatic().run()
